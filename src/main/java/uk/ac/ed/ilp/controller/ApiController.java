@@ -6,12 +6,14 @@ import org.springframework.web.bind.annotation.*;
 import uk.ac.ed.ilp.model.requests.DistanceRequest;
 import uk.ac.ed.ilp.model.LngLat;
 import uk.ac.ed.ilp.model.requests.NextPositionRequest;
-
+import uk.ac.ed.ilp.model.requests.IsInRegionRequest;
+import uk.ac.ed.ilp.service.RegionService;
 
 @RestController
 @RequestMapping("/api/v1")
 public class ApiController {
 
+    private final RegionService regionService = new RegionService();
     private static final String STUDENT_ID = "s2490039";
 
     @GetMapping(value = "/uid", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -84,5 +86,22 @@ public class ApiController {
         double newLat = start.getLat() + STEP * Math.sin(radians);
 
         return ResponseEntity.ok(new LngLat(newLng, newLat));
+    }
+    @PostMapping(
+            value = "/isInRegion",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<?> isInRegion(@RequestBody(required = false) IsInRegionRequest req) {
+        if (req == null || req.getRegionName() == null || req.getPoint() == null) {
+            return ResponseEntity.badRequest().body("Invalid request body");
+        }
+        var name = req.getRegionName();
+        var p = req.getPoint();
+        if (!p.isValid() || !regionService.hasRegion(name)) {
+            return ResponseEntity.badRequest().body("Invalid region or coordinates");
+        }
+        boolean inside = regionService.contains(name, p);
+        return ResponseEntity.ok(inside);
     }
 }

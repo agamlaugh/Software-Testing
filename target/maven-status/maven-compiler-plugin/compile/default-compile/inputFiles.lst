@@ -2,4 +2,6 @@
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/controller/ApiController.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/LngLat.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/requests/DistanceRequest.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/requests/IsInRegionRequest.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/requests/NextPositionRequest.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/RegionService.java
