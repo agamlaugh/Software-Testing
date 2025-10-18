@@ -1,5 +1,9 @@
 package uk.ac.ed.ilp.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+
 public class LngLat {
     private double lng;
     private double lat;

@@ -101,8 +101,16 @@ public class ApiController {
         var pos = req.getPosition();
         var region = req.getRegion();
 
+        var vertices = region.getVertices();
         if (!pos.isValid() || region.getVertices() == null || region.getVertices().isEmpty()) {
             return ResponseEntity.badRequest().body("Invalid position or region vertices");
+        }
+
+        uk.ac.ed.ilp.model.LngLat first = vertices.get(0);
+        uk.ac.ed.ilp.model.LngLat last  = vertices.get(vertices.size() - 1);
+        boolean closed = first.getLng() == last.getLng() && first.getLat() == last.getLat();
+        if (!closed) {
+            return ResponseEntity.badRequest().body("Region polygon must be closed");
         }
 
         boolean inside = regionService.contains(region.getVertices(), pos);
