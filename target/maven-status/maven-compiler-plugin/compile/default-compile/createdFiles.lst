@@ -1,3 +1,4 @@
+uk/ac/ed/ilp/model/requests/NextPositionRequest.class
 uk/ac/ed/ilp/IlpApplication.class
 uk/ac/ed/ilp/model/LngLat.class
 uk/ac/ed/ilp/controller/ApiController.class
