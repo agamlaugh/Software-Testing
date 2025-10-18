@@ -65,4 +65,10 @@ public class RegionService {
         return p.getLng() >= minLng && p.getLng() <= maxLng &&
                p.getLat() >= minLat && p.getLat() <= maxLat;
     }
+    // Overload: check containment for an arbitrary polygon (no name lookup)
+    public boolean contains(java.util.List<uk.ac.ed.ilp.model.LngLat> vertices,
+                            uk.ac.ed.ilp.model.LngLat p) {
+        if (vertices == null || vertices.isEmpty() || p == null || !p.isValid()) return false;
+        return pointInPolygonOrOnBorder(p, vertices);
+    }
 }

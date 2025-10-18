@@ -8,6 +8,7 @@ import uk.ac.ed.ilp.model.LngLat;
 import uk.ac.ed.ilp.model.requests.NextPositionRequest;
 import uk.ac.ed.ilp.model.requests.IsInRegionRequest;
 import uk.ac.ed.ilp.service.RegionService;
+import uk.ac.ed.ilp.model.requests.IsInRegionSpecRequest;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -92,16 +93,19 @@ public class ApiController {
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    public ResponseEntity<?> isInRegion(@RequestBody(required = false) IsInRegionRequest req) {
-        if (req == null || req.getRegionName() == null || req.getPoint() == null) {
+    public ResponseEntity<?> isInRegion(@RequestBody(required = false) IsInRegionSpecRequest req) {
+        if (req == null || req.getPosition() == null || req.getRegion() == null) {
             return ResponseEntity.badRequest().body("Invalid request body");
         }
-        var name = req.getRegionName();
-        var p = req.getPoint();
-        if (!p.isValid() || !regionService.hasRegion(name)) {
-            return ResponseEntity.badRequest().body("Invalid region or coordinates");
+
+        var pos = req.getPosition();
+        var region = req.getRegion();
+
+        if (!pos.isValid() || region.getVertices() == null || region.getVertices().isEmpty()) {
+            return ResponseEntity.badRequest().body("Invalid position or region vertices");
         }
-        boolean inside = regionService.contains(name, p);
+
+        boolean inside = regionService.contains(region.getVertices(), pos);
         return ResponseEntity.ok(inside);
     }
 }
