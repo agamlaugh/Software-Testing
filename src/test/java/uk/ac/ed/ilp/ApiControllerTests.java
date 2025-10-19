@@ -308,6 +308,39 @@ class ApiControllerTests {
     }
 
     @Test
+    void nextPosition_returns400_forMissingAngle() {
+        var url = "http://localhost:" + port + "/api/v1/nextPosition";
+        String req = "{"
+                + "\"start\":{\"lng\":-3.19,\"lat\":55.94}"
+                + "}";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> http = new HttpEntity<>(req, headers);
+        ResponseEntity<String> resp = rest.postForEntity(url, http, String.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody()).contains("Invalid angle");
+    }
+
+    @Test
+    void nextPosition_returns400_forAngleOffCompass() {
+        var url = "http://localhost:" + port + "/api/v1/nextPosition";
+        String req = "{"
+                + "\"start\":{\"lng\":-3.19,\"lat\":55.94},"
+                + "\"angle\":91"
+                + "}";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> http = new HttpEntity<>(req, headers);
+        ResponseEntity<String> resp = rest.postForEntity(url, http, String.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody()).contains("Invalid angle");
+    }
+
+    @Test
     void nextPosition_returns400_forInvalidCoordinates() {
         var url = "http://localhost:" + port + "/api/v1/nextPosition";
         String req = "{"

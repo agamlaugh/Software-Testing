@@ -1,1 +1,8 @@
+uk/ac/ed/ilp/unit/PositionServiceTest.class
+uk/ac/ed/ilp/unit/ValidationServiceTest.class
+uk/ac/ed/ilp/unit/DistanceServiceTest.class
+uk/ac/ed/ilp/unit/RegionServiceTest.class
+uk/ac/ed/ilp/unit/ApiControllerMockitoTest.class
 uk/ac/ed/ilp/ApiControllerTests.class
+uk/ac/ed/ilp/integration/ApiControllerTests.class
+uk/ac/ed/ilp/unit/ApiControllerWebMvcTest.class

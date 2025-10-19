@@ -93,7 +93,12 @@ public class ApiController {
             return ResponseEntity.badRequest().body("Invalid coordinates");
         }
 
-        LngLat nextPosition = positionService.calculateNextPosition(start, req.getAngle());
+        Double angle = req.getAngle();
+        if (!validationService.isValidAngle(angle)) {
+            return ResponseEntity.badRequest().body("Invalid angle");
+        }
+
+        LngLat nextPosition = positionService.calculateNextPosition(start, angle);
         return ResponseEntity.ok(nextPosition);
     }
     @PostMapping(
@@ -117,7 +122,11 @@ public class ApiController {
             return ResponseEntity.badRequest().body("Invalid position or region vertices");
         }
 
-        if (!validationService.isValidRegion(region)) {
+        if (!validationService.hasValidRegionVertices(region)) {
+            return ResponseEntity.badRequest().body("Invalid position or region vertices");
+        }
+
+        if (!validationService.isPolygonClosed(region.getVertices())) {
             return ResponseEntity.badRequest().body("Region polygon must be closed");
         }
 

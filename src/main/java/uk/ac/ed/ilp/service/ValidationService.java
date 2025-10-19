@@ -43,6 +43,25 @@ public class ValidationService {
     public boolean areValidPositions(LngLat position1, LngLat position2) {
         return isValidPosition(position1) && isValidPosition(position2);
     }
+
+    /**
+     * Validates that an angle is provided and finite.
+     *
+     * @param angle Angle in degrees
+     * @return true when angle is non-null and finite
+     */
+    private static final double ANGLE_INCREMENT = 22.5;
+    private static final double ANGLE_EPSILON = 1e-9;
+
+    public boolean isValidAngle(Double angle) {
+        if (angle == null || angle.isNaN() || angle.isInfinite()) {
+            return false;
+        }
+        double normalized = normalizeAngle(angle);
+        double steps = normalized / ANGLE_INCREMENT;
+        double nearest = Math.round(steps);
+        return Math.abs(steps - nearest) <= ANGLE_EPSILON;
+    }
     
     /**
      * Validates that a region has valid vertices and is properly closed.
@@ -51,19 +70,7 @@ public class ValidationService {
      * @return true if region is valid, false otherwise
      */
     public boolean isValidRegion(Region region) {
-        if (region == null || region.getVertices() == null || region.getVertices().isEmpty()) {
-            return false;
-        }
-        
-        List<LngLat> vertices = region.getVertices();
-        if (vertices.size() < 3) {
-            return false; // Need at least 3 points for a polygon
-        }
-        
-        // Check if polygon is closed (first and last points are the same)
-        LngLat first = vertices.get(0);
-        LngLat last = vertices.get(vertices.size() - 1);
-        return first.getLng() == last.getLng() && first.getLat() == last.getLat();
+        return hasValidRegionVertices(region) && isPolygonClosed(region.getVertices());
     }
     
     /**
@@ -75,5 +82,50 @@ public class ValidationService {
      */
     public boolean isValidRegionRequest(LngLat position, Region region) {
         return isValidPosition(position) && isValidRegion(region);
+    }
+
+    /**
+     * Checks whether all vertices exist, form a polygon, and are valid coordinates.
+     */
+    public boolean hasValidRegionVertices(Region region) {
+        if (region == null || region.getVertices() == null || region.getVertices().isEmpty()) {
+            return false;
+        }
+
+        List<LngLat> vertices = region.getVertices();
+        if (vertices.size() < 3) {
+            return false; // Need at least 3 points for a polygon
+        }
+
+        for (LngLat vertex : vertices) {
+            if (!isValidPosition(vertex)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Checks whether the polygon represented by vertices is closed.
+     */
+    public boolean isPolygonClosed(List<LngLat> vertices) {
+        if (vertices == null || vertices.size() < 2) {
+            return false;
+        }
+        LngLat first = vertices.get(0);
+        LngLat last = vertices.get(vertices.size() - 1);
+        return doublesEqual(first.getLng(), last.getLng()) && doublesEqual(first.getLat(), last.getLat());
+    }
+
+    private boolean doublesEqual(double a, double b) {
+        return Math.abs(a - b) <= 1e-9;
+    }
+
+    private double normalizeAngle(double angle) {
+        double normalized = angle % 360.0;
+        if (normalized < 0) {
+            normalized += 360.0;
+        }
+        return normalized;
     }
 }

@@ -161,11 +161,12 @@ class ApiControllerMockitoTest {
         LngLat start = new LngLat(0.0, 0.0);
         LngLat nextPos = new LngLat(0.00015, 0.0);
         request.setStart(start);
-        request.setAngle(0);
+        request.setAngle(0.0);
         
         when(validationService.isValidRequest(request)).thenReturn(true);
         when(validationService.isValidPosition(start)).thenReturn(true);
-        when(positionService.calculateNextPosition(start, 0)).thenReturn(nextPos);
+        when(validationService.isValidAngle(0.0)).thenReturn(true);
+        when(positionService.calculateNextPosition(start, 0.0)).thenReturn(nextPos);
 
         // When
         var result = apiController.nextPosition(request);
@@ -176,7 +177,8 @@ class ApiControllerMockitoTest {
         
         verify(validationService).isValidRequest(request);
         verify(validationService).isValidPosition(start);
-        verify(positionService).calculateNextPosition(start, 0);
+        verify(validationService).isValidAngle(0.0);
+        verify(positionService).calculateNextPosition(start, 0.0);
         verifyNoMoreInteractions(validationService, distanceService, positionService, regionService);
     }
 
@@ -187,7 +189,7 @@ class ApiControllerMockitoTest {
         NextPositionRequest request = new NextPositionRequest();
         LngLat start = new LngLat(200.0, 0.0); // Invalid
         request.setStart(start);
-        request.setAngle(0);
+        request.setAngle(0.0);
         
         when(validationService.isValidRequest(request)).thenReturn(true);
         when(validationService.isValidPosition(start)).thenReturn(false);
@@ -201,6 +203,52 @@ class ApiControllerMockitoTest {
         
         verify(validationService).isValidRequest(request);
         verify(validationService).isValidPosition(start);
+        verifyNoMoreInteractions(validationService, distanceService, positionService, regionService);
+    }
+
+    @Test
+    @DisplayName("nextPosition - Mockito: returns 400 for invalid angle")
+    void nextPosition_returns400_forInvalidAngle() {
+        NextPositionRequest request = new NextPositionRequest();
+        LngLat start = new LngLat(0.0, 0.0);
+        request.setStart(start);
+        request.setAngle(null);
+
+        when(validationService.isValidRequest(request)).thenReturn(true);
+        when(validationService.isValidPosition(start)).thenReturn(true);
+        when(validationService.isValidAngle(null)).thenReturn(false);
+
+        var result = apiController.nextPosition(request);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(400);
+        assertThat(result.getBody()).isEqualTo("Invalid angle");
+
+        verify(validationService).isValidRequest(request);
+        verify(validationService).isValidPosition(start);
+        verify(validationService).isValidAngle(null);
+        verifyNoMoreInteractions(validationService, distanceService, positionService, regionService);
+    }
+
+    @Test
+    @DisplayName("nextPosition - Mockito: returns 400 for off-grid angle")
+    void nextPosition_returns400_forOffGridAngle() {
+        NextPositionRequest request = new NextPositionRequest();
+        LngLat start = new LngLat(0.0, 0.0);
+        request.setStart(start);
+        request.setAngle(91.0);
+
+        when(validationService.isValidRequest(request)).thenReturn(true);
+        when(validationService.isValidPosition(start)).thenReturn(true);
+        when(validationService.isValidAngle(91.0)).thenReturn(false);
+
+        var result = apiController.nextPosition(request);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(400);
+        assertThat(result.getBody()).isEqualTo("Invalid angle");
+
+        verify(validationService).isValidRequest(request);
+        verify(validationService).isValidPosition(start);
+        verify(validationService).isValidAngle(91.0);
         verifyNoMoreInteractions(validationService, distanceService, positionService, regionService);
     }
 
@@ -224,7 +272,8 @@ class ApiControllerMockitoTest {
         
         when(validationService.isValidRequest(request)).thenReturn(true);
         when(validationService.isValidPosition(position)).thenReturn(true);
-        when(validationService.isValidRegion(region)).thenReturn(true);
+        when(validationService.hasValidRegionVertices(region)).thenReturn(true);
+        when(validationService.isPolygonClosed(vertices)).thenReturn(true);
         when(regionService.contains(vertices, position)).thenReturn(true);
 
         // When
@@ -236,7 +285,8 @@ class ApiControllerMockitoTest {
         
         verify(validationService).isValidRequest(request);
         verify(validationService).isValidPosition(position);
-        verify(validationService).isValidRegion(region);
+        verify(validationService).hasValidRegionVertices(region);
+        verify(validationService).isPolygonClosed(vertices);
         verify(regionService).contains(vertices, position);
         verifyNoMoreInteractions(validationService, distanceService, positionService, regionService);
     }
@@ -258,7 +308,8 @@ class ApiControllerMockitoTest {
         
         when(validationService.isValidRequest(request)).thenReturn(true);
         when(validationService.isValidPosition(position)).thenReturn(true);
-        when(validationService.isValidRegion(region)).thenReturn(false);
+        when(validationService.hasValidRegionVertices(region)).thenReturn(true);
+        when(validationService.isPolygonClosed(vertices)).thenReturn(false);
 
         // When
         var result = apiController.isInRegion(request);
@@ -269,7 +320,8 @@ class ApiControllerMockitoTest {
         
         verify(validationService).isValidRequest(request);
         verify(validationService).isValidPosition(position);
-        verify(validationService).isValidRegion(region);
+        verify(validationService).hasValidRegionVertices(region);
+        verify(validationService).isPolygonClosed(vertices);
         verifyNoMoreInteractions(validationService, distanceService, positionService, regionService);
     }
 
@@ -295,7 +347,7 @@ class ApiControllerMockitoTest {
         // Given
         NextPositionRequest request = new NextPositionRequest();
         request.setStart(null);
-        request.setAngle(0);
+        request.setAngle(0.0);
         
         when(validationService.isValidRequest(request)).thenReturn(true);
 

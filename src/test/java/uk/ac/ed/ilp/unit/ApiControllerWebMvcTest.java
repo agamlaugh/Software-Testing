@@ -182,7 +182,8 @@ class ApiControllerWebMvcTest {
         
         when(validationService.isValidRequest(any())).thenReturn(true);
         when(validationService.isValidPosition(any())).thenReturn(true);
-        when(positionService.calculateNextPosition(any(), any(Integer.class))).thenReturn(expectedPosition);
+        when(validationService.isValidAngle(any())).thenReturn(true);
+        when(positionService.calculateNextPosition(any(), anyDouble())).thenReturn(expectedPosition);
 
         // When & Then
         mockMvc.perform(post("/api/v1/nextPosition")
@@ -215,6 +216,27 @@ class ApiControllerWebMvcTest {
                 .andExpect(content().string("Invalid coordinates"));
     }
 
+    @Test
+    @DisplayName("POST /api/v1/nextPosition - WebMvc: returns 400 for missing or invalid angle")
+    void nextPosition_returns400_forInvalidAngle() throws Exception {
+        String requestJson = """
+            {
+                "start": {"lng": 0.0, "lat": 0.0},
+                "angle": 91
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        when(validationService.isValidAngle(any())).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/nextPosition")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid angle"));
+    }
+
     // ========== IS IN REGION TESTS ==========
 
     @Test
@@ -239,7 +261,8 @@ class ApiControllerWebMvcTest {
         
         when(validationService.isValidRequest(any())).thenReturn(true);
         when(validationService.isValidPosition(any())).thenReturn(true);
-        when(validationService.isValidRegion(any())).thenReturn(true);
+        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
+        when(validationService.isPolygonClosed(any())).thenReturn(true);
         when(regionService.contains(any(java.util.List.class), any())).thenReturn(true);
 
         // When & Then
@@ -271,7 +294,8 @@ class ApiControllerWebMvcTest {
         
         when(validationService.isValidRequest(any())).thenReturn(true);
         when(validationService.isValidPosition(any())).thenReturn(true);
-        when(validationService.isValidRegion(any())).thenReturn(false);
+        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
+        when(validationService.isPolygonClosed(any())).thenReturn(false);
 
         // When & Then
         mockMvc.perform(post("/api/v1/isInRegion")

@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>uk.ac.ed</groupId>
-    <artifactId>IlpTutorial1</artifactId>
+    <artifactId>ilp-submission-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>IlpTutorial1</name>
-    <description>IlpTutorial1</description>
+    <name>ilp-submission-service</name>
+    <description>ILP Coursework 1 submission service</description>
     <properties>
         <java.version>21</java.version>
     </properties>

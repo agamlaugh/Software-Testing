@@ -19,8 +19,9 @@ public class PositionService {
      * @param angle Movement angle in degrees (0 = East, 90 = North, etc.)
      * @return Next position after moving one step in the specified direction
      */
-    public LngLat calculateNextPosition(LngLat start, int angle) {
-        double radians = Math.toRadians(angle);
+    public LngLat calculateNextPosition(LngLat start, double angle) {
+        double normalizedAngle = normalizeAngle(angle);
+        double radians = Math.toRadians(normalizedAngle);
         double newLng = start.getLng() + STEP_SIZE * Math.cos(radians);
         double newLat = start.getLat() + STEP_SIZE * Math.sin(radians);
         return new LngLat(newLng, newLat);
@@ -33,5 +34,13 @@ public class PositionService {
      */
     public double getStepSize() {
         return STEP_SIZE;
+    }
+
+    private double normalizeAngle(double angle) {
+        double normalized = angle % 360.0;
+        if (normalized < 0) {
+            normalized += 360.0;
+        }
+        return normalized;
     }
 }

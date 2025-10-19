@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class NextPositionRequest {
     private LngLat start;
-    private int angle; // degrees
+    private Double angle; // degrees
 }

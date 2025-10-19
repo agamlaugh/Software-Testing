@@ -69,6 +69,23 @@ class ValidationServiceTest {
     }
 
     @Test
+    @DisplayName("isValidAngle - Simple case: valid compass angle")
+    void isValidAngle_returnsTrue_forValidCompassAngle() {
+        assertThat(validationService.isValidAngle(45.0)).isTrue();
+        assertThat(validationService.isValidAngle(-90.0)).isTrue();
+        assertThat(validationService.isValidAngle(360.0)).isTrue();
+    }
+
+    @Test
+    @DisplayName("isValidAngle - Fail case: null, NaN, or off-grid")
+    void isValidAngle_returnsFalse_forInvalidValues() {
+        assertThat(validationService.isValidAngle(null)).isFalse();
+        assertThat(validationService.isValidAngle(Double.NaN)).isFalse();
+        assertThat(validationService.isValidAngle(Double.POSITIVE_INFINITY)).isFalse();
+        assertThat(validationService.isValidAngle(10.0)).isFalse();
+    }
+
+    @Test
     @DisplayName("isValidRegion - Simple case: valid closed polygon")
     void isValidRegion_returnsTrue_forValidClosedPolygon() {
         // Given
@@ -184,6 +201,31 @@ class ValidationServiceTest {
 
         // Then
         assertThat(result).isTrue();
+    }
+
+    @Test
+    @DisplayName("hasValidRegionVertices - Detects invalid coordinate")
+    void hasValidRegionVertices_returnsFalse_forInvalidCoordinate() {
+        Region region = new Region();
+        region.setVertices(Arrays.asList(
+                new LngLat(0.0, 0.0),
+                new LngLat(200.0, 0.0),
+                new LngLat(0.0, 0.0)
+        ));
+
+        assertThat(validationService.hasValidRegionVertices(region)).isFalse();
+    }
+
+    @Test
+    @DisplayName("isPolygonClosed - Detects open polygon")
+    void isPolygonClosed_returnsFalse_forOpenPolygon() {
+        List<LngLat> vertices = Arrays.asList(
+                new LngLat(0.0, 0.0),
+                new LngLat(1.0, 0.0),
+                new LngLat(1.0, 1.0)
+        );
+
+        assertThat(validationService.isPolygonClosed(vertices)).isFalse();
     }
 
     // ========== FAILURE CASES ==========

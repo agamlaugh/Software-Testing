@@ -28,7 +28,7 @@ public class PositionMapper {
     /**
      * Creates a NextPositionRequest DTO from start position and angle
      */
-    public NextPositionRequest createNextPositionRequest(LngLat start, int angle) {
+    public NextPositionRequest createNextPositionRequest(LngLat start, Double angle) {
         NextPositionRequest request = new NextPositionRequest();
         request.setStart(start);
         request.setAngle(angle);
