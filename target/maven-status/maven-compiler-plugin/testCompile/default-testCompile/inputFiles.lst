@@ -1,1 +1,8 @@
 /Users/agamcohen/Desktop/ilp_submission_1/src/test/java/uk/ac/ed/ilp/ApiControllerTests.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/test/java/uk/ac/ed/ilp/integration/ApiControllerTests.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/test/java/uk/ac/ed/ilp/unit/ApiControllerMockitoTest.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/test/java/uk/ac/ed/ilp/unit/ApiControllerWebMvcTest.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/test/java/uk/ac/ed/ilp/unit/DistanceServiceTest.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/test/java/uk/ac/ed/ilp/unit/PositionServiceTest.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/test/java/uk/ac/ed/ilp/unit/RegionServiceTest.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/test/java/uk/ac/ed/ilp/unit/ValidationServiceTest.java

@@ -1,9 +1,8 @@
+uk/ac/ed/ilp/model/requests/DistanceRequest.class
+uk/ac/ed/ilp/model/LngLat.class
+uk/ac/ed/ilp/model/Region.class
 uk/ac/ed/ilp/IlpApplication.class
 uk/ac/ed/ilp/model/requests/IsInRegionSpecRequest.class
 uk/ac/ed/ilp/service/RegionService.class
-uk/ac/ed/ilp/model/requests/DistanceRequest.class
-uk/ac/ed/ilp/model/requests/IsInRegionRequest.class
 uk/ac/ed/ilp/model/requests/NextPositionRequest.class
-uk/ac/ed/ilp/model/LngLat.class
 uk/ac/ed/ilp/controller/ApiController.class
-uk/ac/ed/ilp/model/Region.class
