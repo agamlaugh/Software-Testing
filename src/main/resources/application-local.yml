@@ -1,0 +1,18 @@
+# Local development configuration
+# Following Lecture 5 configuration patterns
+spring:
+  profiles:
+    active: local
+
+# Local development settings
+ilp:
+  service:
+    debug: true
+    timeout: 30000
+    max-retries: 3
+
+# Logging for local development
+logging:
+  level:
+    uk.ac.ed.ilp: DEBUG
+    org.springframework.web: DEBUG

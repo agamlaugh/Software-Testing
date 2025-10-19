@@ -1,9 +1,11 @@
 package uk.ac.ed.ilp.service;
 
 import uk.ac.ed.ilp.model.LngLat;
+import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+@Service
 public class RegionService {
 
     // TODO: Replace with the official CW1 region polygons.

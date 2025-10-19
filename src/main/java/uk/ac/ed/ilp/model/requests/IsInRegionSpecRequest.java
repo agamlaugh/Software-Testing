@@ -3,17 +3,15 @@ package uk.ac.ed.ilp.model.requests;
 import uk.ac.ed.ilp.model.LngLat;
 import uk.ac.ed.ilp.model.Region;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Getter
+@Setter
+@NoArgsConstructor
 public class IsInRegionSpecRequest {
     private LngLat position;
     private Region region;
-
-    public IsInRegionSpecRequest() {}
-
-    public LngLat getPosition() { return position; }
-    public void setPosition(LngLat position) { this.position = position; }
-
-    public Region getRegion() { return region; }
-    public void setRegion(Region region) { this.region = region; }
 }

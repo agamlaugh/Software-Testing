@@ -2,17 +2,15 @@ package uk.ac.ed.ilp.model.requests;
 
 import uk.ac.ed.ilp.model.LngLat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Getter
+@Setter
+@NoArgsConstructor
 public class NextPositionRequest {
     private LngLat start;
     private int angle; // degrees
-
-    public NextPositionRequest() {}
-
-    public LngLat getStart() { return start; }
-    public void setStart(LngLat start) { this.start = start; }
-
-    public int getAngle() { return angle; }
-    public void setAngle(int angle) { this.angle = angle; }
 }

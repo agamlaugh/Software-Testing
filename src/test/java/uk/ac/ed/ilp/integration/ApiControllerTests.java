@@ -1,4 +1,4 @@
-package uk.ac.ed.ilp;
+package uk.ac.ed.ilp.integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -469,7 +469,7 @@ class ApiControllerTests {
         ResponseEntity<Double> resp = rest.postForEntity(url, http, Double.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody()).isCloseTo(402.49, offset(0.1));
+        assertThat(resp.getBody()).isCloseTo(402.49, offset(0.1)); // Euclidean distance for boundary coordinates
     }
 
     @Test
@@ -523,6 +523,23 @@ class ApiControllerTests {
         assertThat(resp.getBody()).isFalse();
     }
 
+    @Test
+    void nextPosition_returnsCorrectPosition_forNegativeAngle_Integration() {
+        var url = "http://localhost:" + port + "/api/v1/nextPosition";
+        String req = "{"
+                + "\"start\":{\"lng\":0.0,\"lat\":0.0},"
+                + "\"angle\":-90"
+                + "}";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> http = new HttpEntity<>(req, headers);
+        ResponseEntity<LngLat> resp = rest.postForEntity(url, http, LngLat.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().getLng()).isCloseTo(0.0, offset(0.000001));
+        assertThat(resp.getBody().getLat()).isCloseTo(-0.00015, offset(0.000001));
+    }
 
     @Test
     void nextPosition_returnsCorrectPosition_forLargeAngle() {
@@ -568,6 +585,31 @@ class ApiControllerTests {
         assertThat(resp.getBody()).isTrue();
     }
 
+    @Test
+    void isInRegion_returnsFalse_forPointOutside_Integration() {
+        var url = "http://localhost:" + port + "/api/v1/isInRegion";
+        String req = "{"
+                + "\"position\":{\"lng\":-3.15,\"lat\":55.90},"
+                + "\"region\":{"
+                + "  \"name\":\"test\","
+                + "  \"vertices\":["
+                + "    {\"lng\":-3.20,\"lat\":55.93},"
+                + "    {\"lng\":-3.18,\"lat\":55.93},"
+                + "    {\"lng\":-3.18,\"lat\":55.95},"
+                + "    {\"lng\":-3.20,\"lat\":55.95},"
+                + "    {\"lng\":-3.20,\"lat\":55.93}"
+                + "  ]"
+                + "}"
+                + "}";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> http = new HttpEntity<>(req, headers);
+        ResponseEntity<Boolean> resp = rest.postForEntity(url, http, Boolean.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).isFalse();
+    }
 
     @Test
     void isInRegion_returns400_forUnclosedPolygon() {

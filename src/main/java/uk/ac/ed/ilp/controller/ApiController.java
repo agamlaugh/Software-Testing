@@ -1,21 +1,37 @@
 package uk.ac.ed.ilp.controller;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import uk.ac.ed.ilp.model.requests.DistanceRequest;
 import uk.ac.ed.ilp.model.LngLat;
+import uk.ac.ed.ilp.model.Region;
 import uk.ac.ed.ilp.model.requests.NextPositionRequest;
-import uk.ac.ed.ilp.model.requests.IsInRegionRequest;
 import uk.ac.ed.ilp.service.RegionService;
+import uk.ac.ed.ilp.service.DistanceService;
+import uk.ac.ed.ilp.service.PositionService;
+import uk.ac.ed.ilp.service.ValidationService;
 import uk.ac.ed.ilp.model.requests.IsInRegionSpecRequest;
 
 @RestController
 @RequestMapping("/api/v1")
 public class ApiController {
 
-    private final RegionService regionService = new RegionService();
+    private final RegionService regionService;
+    private final DistanceService distanceService;
+    private final PositionService positionService;
+    private final ValidationService validationService;
     private static final String STUDENT_ID = "s2490039";
+
+    @Autowired
+    public ApiController(RegionService regionService, DistanceService distanceService, 
+                        PositionService positionService, ValidationService validationService) {
+        this.regionService = regionService;
+        this.distanceService = distanceService;
+        this.positionService = positionService;
+        this.validationService = validationService;
+    }
 
     @GetMapping(value = "/uid", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> uid() {
@@ -28,21 +44,18 @@ public class ApiController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public ResponseEntity<?> distanceTo(@RequestBody(required = false) DistanceRequest req) {
-        if (req == null || req.getPosition1() == null || req.getPosition2() == null) {
+        if (!validationService.isValidRequest(req) || req.getPosition1() == null || req.getPosition2() == null) {
             return ResponseEntity.badRequest().body("Invalid request body");
         }
 
-        var a = req.getPosition1();
-        var b = req.getPosition2();
+        LngLat position1 = req.getPosition1();
+        LngLat position2 = req.getPosition2();
 
-        if (!a.isValid() || !b.isValid()) {
+        if (!validationService.areValidPositions(position1, position2)) {
             return ResponseEntity.badRequest().body("Invalid coordinates");
         }
 
-        double dLat = a.getLat() - b.getLat();
-        double dLng = a.getLng() - b.getLng();
-        double distance = Math.sqrt(dLat * dLat + dLng * dLng);
-
+        double distance = distanceService.calculateDistance(position1, position2);
         return ResponseEntity.ok(distance);
     }
     @PostMapping(
@@ -51,20 +64,18 @@ public class ApiController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public ResponseEntity<?> isCloseTo(@RequestBody(required = false) DistanceRequest req) {
-        if (req == null || req.getPosition1() == null || req.getPosition2() == null) {
+        if (!validationService.isValidRequest(req) || req.getPosition1() == null || req.getPosition2() == null) {
             return ResponseEntity.badRequest().body("Invalid request body");
         }
-        var a = req.getPosition1();
-        var b = req.getPosition2();
-        if (!a.isValid() || !b.isValid()) {
+        
+        LngLat position1 = req.getPosition1();
+        LngLat position2 = req.getPosition2();
+        
+        if (!validationService.areValidPositions(position1, position2)) {
             return ResponseEntity.badRequest().body("Invalid coordinates");
         }
 
-        double dLat = a.getLat() - b.getLat();
-        double dLng = a.getLng() - b.getLng();
-        double distance = Math.sqrt(dLat * dLat + dLng * dLng);
-
-        boolean result = distance < 0.00015;
+        boolean result = distanceService.areClose(position1, position2);
         return ResponseEntity.ok(result);
     }
     @PostMapping(
@@ -73,20 +84,17 @@ public class ApiController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public ResponseEntity<?> nextPosition(@RequestBody(required = false) NextPositionRequest req) {
-        if (req == null || req.getStart() == null) {
+        if (!validationService.isValidRequest(req) || req.getStart() == null) {
             return ResponseEntity.badRequest().body("Invalid request body");
         }
+        
         LngLat start = req.getStart();
-        if (!start.isValid()) {
+        if (!validationService.isValidPosition(start)) {
             return ResponseEntity.badRequest().body("Invalid coordinates");
         }
 
-        final double STEP = 0.00015;
-        double radians = Math.toRadians(req.getAngle());
-        double newLng = start.getLng() + STEP * Math.cos(radians);
-        double newLat = start.getLat() + STEP * Math.sin(radians);
-
-        return ResponseEntity.ok(new LngLat(newLng, newLat));
+        LngLat nextPosition = positionService.calculateNextPosition(start, req.getAngle());
+        return ResponseEntity.ok(nextPosition);
     }
     @PostMapping(
             value = "/isInRegion",
@@ -94,26 +102,26 @@ public class ApiController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public ResponseEntity<?> isInRegion(@RequestBody(required = false) IsInRegionSpecRequest req) {
-        if (req == null || req.getPosition() == null || req.getRegion() == null) {
+        if (!validationService.isValidRequest(req) || req.getPosition() == null || req.getRegion() == null) {
             return ResponseEntity.badRequest().body("Invalid request body");
         }
 
-        var pos = req.getPosition();
-        var region = req.getRegion();
+        LngLat position = req.getPosition();
+        Region region = req.getRegion();
 
-        var vertices = region.getVertices();
-        if (!pos.isValid() || region.getVertices() == null || region.getVertices().isEmpty()) {
+        if (!validationService.isValidPosition(position)) {
             return ResponseEntity.badRequest().body("Invalid position or region vertices");
         }
 
-        uk.ac.ed.ilp.model.LngLat first = vertices.get(0);
-        uk.ac.ed.ilp.model.LngLat last  = vertices.get(vertices.size() - 1);
-        boolean closed = first.getLng() == last.getLng() && first.getLat() == last.getLat();
-        if (!closed) {
+        if (region.getVertices() == null || region.getVertices().isEmpty()) {
+            return ResponseEntity.badRequest().body("Invalid position or region vertices");
+        }
+
+        if (!validationService.isValidRegion(region)) {
             return ResponseEntity.badRequest().body("Region polygon must be closed");
         }
 
-        boolean inside = regionService.contains(region.getVertices(), pos);
+        boolean inside = regionService.contains(region.getVertices(), position);
         return ResponseEntity.ok(inside);
     }
 }

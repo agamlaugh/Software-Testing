@@ -1,0 +1,19 @@
+# Test configuration
+# Following Lecture 5 configuration patterns
+spring:
+  profiles:
+    active: test
+
+# Test settings
+ilp:
+  service:
+    debug: true
+    timeout: 5000
+    max-retries: 1
+
+# Test logging
+logging:
+  level:
+    uk.ac.ed.ilp: INFO
+    org.springframework.web: WARN
+    org.springframework.test: DEBUG

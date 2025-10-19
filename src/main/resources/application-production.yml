@@ -1,0 +1,19 @@
+# Production configuration
+# Following Lecture 5 configuration patterns
+spring:
+  profiles:
+    active: production
+
+# Production settings
+ilp:
+  service:
+    debug: false
+    timeout: 10000
+    max-retries: 1
+
+# Minimal logging for production
+logging:
+  level:
+    uk.ac.ed.ilp: INFO
+    org.springframework.web: WARN
+    root: WARN
