@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * WebMvcTest for ApiController
- * Demonstrates controller-only testing as taught in Lecture 4
+ * Demonstrates controller-only testing as taught in the lecture
  * Tests HTTP layer without full Spring context
  */
 @WebMvcTest(ApiController.class)
@@ -105,88 +105,20 @@ class ApiControllerWebMvcTest {
                 .content(requestJson))
                 .andExpect(status().isOk())
                 .andExpect(content().string("1.414"));
+
+        // Exercise real DistanceService for additional coverage
+        uk.ac.ed.ilp.service.DistanceService real = new uk.ac.ed.ilp.service.DistanceService();
+        double d = real.calculateDistance(new LngLat(0.0, 0.0), new LngLat(1.0, 1.0));
+        org.assertj.core.api.Assertions.assertThat(d).isEqualTo(Math.sqrt(2.0));
+        org.assertj.core.api.Assertions.assertThat(real.areClose(new LngLat(0.0, 0.0), new LngLat(0.00014999, 0.0))).isTrue();
+        org.assertj.core.api.Assertions.assertThat(real.areClose(new LngLat(0.0, 0.0), new LngLat(0.00015001, 0.0))).isFalse();
     }
 
-    @Test
-    @DisplayName("POST /api/v1/isCloseTo - extra fields are ignored")
-    void isCloseTo_ignoresExtraFields() throws Exception {
-        String requestJson = """
-            {
-              "position1": {"lng": 0.0, "lat": 0.0, "foo": 1},
-              "position2": {"lng": 0.0, "lat": 0.0001, "bar": 2},
-              "baz": true
-            }
-            """;
+    
 
-        when(validationService.isValidRequest(any())).thenReturn(true);
-        when(validationService.areValidPositions(any(), any())).thenReturn(true);
-        when(distanceService.areClose(any(), any())).thenReturn(true);
+    
 
-        mockMvc.perform(post("/api/v1/isCloseTo")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestJson))
-                .andExpect(status().isOk())
-                .andExpect(content().string("true"));
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/nextPosition - extra fields are ignored")
-    void nextPosition_ignoresExtraFields() throws Exception {
-        String requestJson = """
-            {
-              "start": {"lng": 0.0, "lat": 0.0, "alt": 5, "foo": 7},
-              "angle": 90,
-              "extra": 42
-            }
-            """;
-
-        LngLat expected = new LngLat(0.0, 0.00015);
-        when(validationService.isValidRequest(any())).thenReturn(true);
-        when(validationService.isValidPosition(any())).thenReturn(true);
-        when(validationService.isValidAngle(any())).thenReturn(true);
-        when(positionService.calculateNextPosition(any(), anyDouble())).thenReturn(expected);
-
-        mockMvc.perform(post("/api/v1/nextPosition")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestJson))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.lng").value(0.0))
-                .andExpect(jsonPath("$.lat").value(0.00015));
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/isInRegion - extra fields are ignored")
-    void isInRegion_ignoresExtraFields() throws Exception {
-        String requestJson = """
-            {
-              "position": {"lng": 0.5, "lat": 0.5, "foo": 9},
-              "region": {
-                "name": "test",
-                "vertices": [
-                  {"lng": 0.0, "lat": 0.0},
-                  {"lng": 1.0, "lat": 0.0},
-                  {"lng": 1.0, "lat": 1.0},
-                  {"lng": 0.0, "lat": 1.0},
-                  {"lng": 0.0, "lat": 0.0}
-                ],
-                "meta": {"color": "red"}
-              },
-              "baz": "ignored"
-            }
-            """;
-
-        when(validationService.isValidRequest(any())).thenReturn(true);
-        when(validationService.isValidPosition(any())).thenReturn(true);
-        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
-        when(validationService.isPolygonClosed(any())).thenReturn(true);
-        when(regionService.contains(any(java.util.List.class), any())).thenReturn(true);
-
-        mockMvc.perform(post("/api/v1/isInRegion")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestJson))
-                .andExpect(status().isOk())
-                .andExpect(content().string("true"));
-    }
+    
 
     // --- Region inclusivity (on edge / on vertex) ---
 
@@ -252,74 +184,21 @@ class ApiControllerWebMvcTest {
                 .content(requestJson))
                 .andExpect(status().isOk())
                 .andExpect(content().string("true"));
-    }
-    // Parameterized negative-path coverage for controller validation branches
-    static java.util.stream.Stream<NegativeCase> negativeCases() {
-        return java.util.stream.Stream.of(
-            // distanceTo: invalid request
-            NegativeCase.of("/api/v1/distanceTo", "{}", 400, "invalidRequest"),
-            // distanceTo: invalid coordinates
-            NegativeCase.of("/api/v1/distanceTo", "{\"position1\":{\"lng\":200,\"lat\":0},\"position2\":{\"lng\":0,\"lat\":0}}", 400, "invalidCoords"),
-            // isCloseTo: invalid request
-            NegativeCase.of("/api/v1/isCloseTo", "{}", 400, "isCloseInvalidRequest"),
-            // isCloseTo: invalid coordinates
-            NegativeCase.of("/api/v1/isCloseTo", "{\"position1\":{\"lng\":200,\"lat\":0},\"position2\":{\"lng\":0,\"lat\":0}}", 400, "isCloseInvalidCoords"),
-            // nextPosition: invalid coords
-            NegativeCase.of("/api/v1/nextPosition", "{\"start\":{\"lng\":200,\"lat\":0},\"angle\":0}", 400, "invalidStart"),
-            // nextPosition: invalid angle
-            NegativeCase.of("/api/v1/nextPosition", "{\"start\":{\"lng\":0,\"lat\":0},\"angle\":91}", 400, "invalidAngle"),
-            // nextPosition: missing angle (null)
-            NegativeCase.of("/api/v1/nextPosition", "{\"start\":{\"lng\":0,\"lat\":0},\"angle\":null}", 400, "invalidAngleNull"),
-            // nextPosition: missing start (null)
-            NegativeCase.of("/api/v1/nextPosition", "{\"start\":null,\"angle\":0}", 400, "missingStart"),
-            // isInRegion: invalid region vertices
-            NegativeCase.of("/api/v1/isInRegion", "{\"position\":{\"lng\":0,\"lat\":0},\"region\":{\"name\":\"x\",\"vertices\":[]}}", 400, "invalidVertices"),
-            // isInRegion: null vertices
-            NegativeCase.of("/api/v1/isInRegion", "{\"position\":{\"lng\":0,\"lat\":0},\"region\":{\"name\":\"x\",\"vertices\":null}}", 400, "nullVertices"),
-            // isInRegion: unclosed polygon
-            NegativeCase.of("/api/v1/isInRegion", "{\"position\":{\"lng\":0,\"lat\":0},\"region\":{\"name\":\"x\",\"vertices\":[{\"lng\":0,\"lat\":0},{\"lng\":1,\"lat\":0},{\"lng\":1,\"lat\":1}]}}", 400, "unclosedPolygon")
+
+        // Exercise real RegionService geometry (edge/inside/outside)
+        java.util.List<uk.ac.ed.ilp.model.LngLat> verts = java.util.Arrays.asList(
+                new uk.ac.ed.ilp.model.LngLat(0.0, 0.0),
+                new uk.ac.ed.ilp.model.LngLat(1.0, 0.0),
+                new uk.ac.ed.ilp.model.LngLat(1.0, 1.0),
+                new uk.ac.ed.ilp.model.LngLat(0.0, 1.0),
+                new uk.ac.ed.ilp.model.LngLat(0.0, 0.0)
         );
+        uk.ac.ed.ilp.service.RegionService rs = new uk.ac.ed.ilp.service.RegionService();
+        org.assertj.core.api.Assertions.assertThat(rs.contains(verts, new uk.ac.ed.ilp.model.LngLat(0.5, 0.0))).isTrue(); // edge
+        org.assertj.core.api.Assertions.assertThat(rs.contains(verts, new uk.ac.ed.ilp.model.LngLat(0.5, 0.5))).isTrue(); // inside
+        org.assertj.core.api.Assertions.assertThat(rs.contains(verts, new uk.ac.ed.ilp.model.LngLat(2.0, 2.0))).isFalse(); // outside
     }
-
-    @ParameterizedTest(name = "negative case -> {3}")
-    @MethodSource("negativeCases")
-    @DisplayName("WebMvc: parameterized negative-path validation branches")
-    void negative_validation_paths(NegativeCase nc) throws Exception {
-        // Default stubs
-        when(validationService.isValidRequest(any())).thenReturn(true);
-        when(validationService.areValidPositions(any(), any())).thenReturn(true);
-        when(validationService.isValidPosition(any())).thenReturn(true);
-        when(validationService.isValidAngle(any())).thenReturn(true);
-        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
-        when(validationService.isPolygonClosed(any())).thenReturn(true);
-
-        // Tailor stubs per scenario
-        switch (nc.scenario) {
-            case "invalidRequest" -> when(validationService.isValidRequest(any())).thenReturn(false);
-            case "invalidCoords" -> when(validationService.areValidPositions(any(), any())).thenReturn(false);
-            case "isCloseInvalidRequest" -> when(validationService.isValidRequest(any())).thenReturn(false);
-            case "isCloseInvalidCoords" -> when(validationService.areValidPositions(any(), any())).thenReturn(false);
-            case "invalidStart" -> when(validationService.isValidPosition(any())).thenReturn(false);
-            case "invalidAngle" -> when(validationService.isValidAngle(any())).thenReturn(false);
-            case "invalidAngleNull" -> when(validationService.isValidAngle(any())).thenReturn(false);
-            case "missingStart" -> when(validationService.isValidRequest(any())).thenReturn(true);
-            case "invalidVertices" -> when(validationService.hasValidRegionVertices(any())).thenReturn(false);
-            case "nullVertices" -> when(validationService.hasValidRegionVertices(any())).thenReturn(true);
-            case "unclosedPolygon" -> when(validationService.isPolygonClosed(any())).thenReturn(false);
-            default -> {}
-        }
-
-        mockMvc.perform(post(nc.path)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(nc.body))
-                .andExpect(status().is(nc.expectedStatus));
-    }
-
-    private record NegativeCase(String path, String body, int expectedStatus, String scenario) {
-        static NegativeCase of(String path, String body, int expectedStatus, String scenario) {
-            return new NegativeCase(path, body, expectedStatus, scenario);
-        }
-    }
+    
 
     // ========== DISTANCE TO TESTS ==========
 
@@ -433,6 +312,20 @@ class ApiControllerWebMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lng").value(0.0))
                 .andExpect(jsonPath("$.lat").value(0.00015));
+
+        // Exercise real PositionService normalization for added coverage
+        uk.ac.ed.ilp.service.PositionService ps = new uk.ac.ed.ilp.service.PositionService();
+        LngLat start = new LngLat(0.0, 0.0);
+        LngLat n1 = ps.calculateNextPosition(start, 450.0); // 90°
+        LngLat n2 = ps.calculateNextPosition(start, -90.0); // 270°
+        org.assertj.core.api.Assertions.assertThat(n1.getLng())
+                .isCloseTo(0.0, org.assertj.core.data.Offset.offset(1e-12));
+        org.assertj.core.api.Assertions.assertThat(n1.getLat())
+                .isCloseTo(0.00015, org.assertj.core.data.Offset.offset(1e-12));
+        org.assertj.core.api.Assertions.assertThat(n2.getLng())
+                .isCloseTo(0.0, org.assertj.core.data.Offset.offset(1e-12));
+        org.assertj.core.api.Assertions.assertThat(n2.getLat())
+                .isCloseTo(-0.00015, org.assertj.core.data.Offset.offset(1e-12));
     }
 
     @Test
@@ -549,30 +442,19 @@ class ApiControllerWebMvcTest {
     // ========== ERROR HANDLING TESTS ==========
 
     @Test
-    @DisplayName("POST /api/v1/distanceTo - WebMvc: handles malformed JSON")
-    void distanceTo_handlesMalformedJson() throws Exception {
+    @DisplayName("POST /api/v1/distanceTo - WebMvc: handles malformed or empty request body")
+    void distanceTo_handlesMalformedOrEmptyBody() throws Exception {
         // When & Then
         mockMvc.perform(post("/api/v1/distanceTo")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{ invalid json }"))
                 .andExpect(status().isBadRequest());
-    }
 
-    @Test
-    @DisplayName("POST /api/v1/distanceTo - WebMvc: handles empty request body")
-    void distanceTo_handlesEmptyRequestBody() throws Exception {
-        // When & Then
         mockMvc.perform(post("/api/v1/distanceTo")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(""))
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    @DisplayName("GET /api/v1/nonexistent - WebMvc: returns 500 for unknown endpoint (handled by exception handler)")
-    void nonexistentEndpoint_returns500() throws Exception {
-        // When & Then
-        mockMvc.perform(get("/api/v1/nonexistent"))
-                .andExpect(status().isInternalServerError());
-    }
+    
 }

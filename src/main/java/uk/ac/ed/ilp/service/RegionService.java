@@ -8,9 +8,6 @@ import java.util.*;
 @Service
 public class RegionService {
 
-    // TODO: Replace with the official CW1 region polygons.
-    // For now we define one simple square region named "sample"
-    // (centered roughly at -3.19, 55.94 with ~0.001 side length).
     private final Map<String, List<LngLat>> regions = new HashMap<>();
 
     public RegionService() {

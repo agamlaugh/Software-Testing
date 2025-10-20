@@ -1,5 +1,5 @@
 # Production configuration
-# Following Lecture 5 configuration patterns
+# Following Lecture configuration patterns
 spring:
   profiles:
     active: production

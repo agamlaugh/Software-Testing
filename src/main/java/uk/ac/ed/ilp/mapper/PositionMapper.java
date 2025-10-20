@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Mapper for converting between different data transfer objects
- * Following the DTO pattern from Lecture 5
+ * Following the DTO pattern from Lecture
  */
 @Component
 public class PositionMapper {
