@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
@@ -58,6 +61,264 @@ class ApiControllerWebMvcTest {
         mockMvc.perform(get("/api/v1/uid"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("s2490039"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/isCloseTo - WebMvc: boundary 0.00015 is NOT close")
+    void isCloseTo_boundary_notClose() throws Exception {
+        DistanceRequest request = new DistanceRequest();
+        LngLat p1 = new LngLat(0.0, 0.0);
+        LngLat p2 = new LngLat(0.00015, 0.0); // distance exactly threshold
+        request.setPosition1(p1);
+        request.setPosition2(p2);
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.areValidPositions(any(), any())).thenReturn(true);
+        when(distanceService.areClose(any(), any())).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/isCloseTo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("false"));
+    }
+
+    // --- Unknown/extra JSON field happy-path tests ---
+
+    @Test
+    @DisplayName("POST /api/v1/distanceTo - extra fields are ignored")
+    void distanceTo_ignoresExtraFields() throws Exception {
+        String requestJson = """
+            {
+              "position1": {"lng": 0.0, "lat": 0.0, "foo": 1},
+              "position2": {"lng": 1.0, "lat": 1.0, "bar": 2},
+              "baz": "ignored"
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.areValidPositions(any(), any())).thenReturn(true);
+        when(distanceService.calculateDistance(any(), any())).thenReturn(1.414);
+
+        mockMvc.perform(post("/api/v1/distanceTo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(content().string("1.414"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/isCloseTo - extra fields are ignored")
+    void isCloseTo_ignoresExtraFields() throws Exception {
+        String requestJson = """
+            {
+              "position1": {"lng": 0.0, "lat": 0.0, "foo": 1},
+              "position2": {"lng": 0.0, "lat": 0.0001, "bar": 2},
+              "baz": true
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.areValidPositions(any(), any())).thenReturn(true);
+        when(distanceService.areClose(any(), any())).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/isCloseTo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(content().string("true"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/nextPosition - extra fields are ignored")
+    void nextPosition_ignoresExtraFields() throws Exception {
+        String requestJson = """
+            {
+              "start": {"lng": 0.0, "lat": 0.0, "alt": 5, "foo": 7},
+              "angle": 90,
+              "extra": 42
+            }
+            """;
+
+        LngLat expected = new LngLat(0.0, 0.00015);
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        when(validationService.isValidAngle(any())).thenReturn(true);
+        when(positionService.calculateNextPosition(any(), anyDouble())).thenReturn(expected);
+
+        mockMvc.perform(post("/api/v1/nextPosition")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lng").value(0.0))
+                .andExpect(jsonPath("$.lat").value(0.00015));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/isInRegion - extra fields are ignored")
+    void isInRegion_ignoresExtraFields() throws Exception {
+        String requestJson = """
+            {
+              "position": {"lng": 0.5, "lat": 0.5, "foo": 9},
+              "region": {
+                "name": "test",
+                "vertices": [
+                  {"lng": 0.0, "lat": 0.0},
+                  {"lng": 1.0, "lat": 0.0},
+                  {"lng": 1.0, "lat": 1.0},
+                  {"lng": 0.0, "lat": 1.0},
+                  {"lng": 0.0, "lat": 0.0}
+                ],
+                "meta": {"color": "red"}
+              },
+              "baz": "ignored"
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
+        when(validationService.isPolygonClosed(any())).thenReturn(true);
+        when(regionService.contains(any(java.util.List.class), any())).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/isInRegion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(content().string("true"));
+    }
+
+    // --- Region inclusivity (on edge / on vertex) ---
+
+    @Test
+    @DisplayName("POST /api/v1/isInRegion - point on edge returns true")
+    void isInRegion_pointOnEdge_true() throws Exception {
+        String requestJson = """
+            {
+              "position": {"lng": 0.5, "lat": 0.0},
+              "region": {
+                "name": "test",
+                "vertices": [
+                  {"lng": 0.0, "lat": 0.0},
+                  {"lng": 1.0, "lat": 0.0},
+                  {"lng": 1.0, "lat": 1.0},
+                  {"lng": 0.0, "lat": 1.0},
+                  {"lng": 0.0, "lat": 0.0}
+                ]
+              }
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
+        when(validationService.isPolygonClosed(any())).thenReturn(true);
+        when(regionService.contains(any(java.util.List.class), any())).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/isInRegion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(content().string("true"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/isInRegion - point on vertex returns true")
+    void isInRegion_pointOnVertex_true() throws Exception {
+        String requestJson = """
+            {
+              "position": {"lng": 0.0, "lat": 0.0},
+              "region": {
+                "name": "test",
+                "vertices": [
+                  {"lng": 0.0, "lat": 0.0},
+                  {"lng": 1.0, "lat": 0.0},
+                  {"lng": 1.0, "lat": 1.0},
+                  {"lng": 0.0, "lat": 1.0},
+                  {"lng": 0.0, "lat": 0.0}
+                ]
+              }
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
+        when(validationService.isPolygonClosed(any())).thenReturn(true);
+        when(regionService.contains(any(java.util.List.class), any())).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/isInRegion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(content().string("true"));
+    }
+    // Parameterized negative-path coverage for controller validation branches
+    static java.util.stream.Stream<NegativeCase> negativeCases() {
+        return java.util.stream.Stream.of(
+            // distanceTo: invalid request
+            NegativeCase.of("/api/v1/distanceTo", "{}", 400, "invalidRequest"),
+            // distanceTo: invalid coordinates
+            NegativeCase.of("/api/v1/distanceTo", "{\"position1\":{\"lng\":200,\"lat\":0},\"position2\":{\"lng\":0,\"lat\":0}}", 400, "invalidCoords"),
+            // isCloseTo: invalid request
+            NegativeCase.of("/api/v1/isCloseTo", "{}", 400, "isCloseInvalidRequest"),
+            // isCloseTo: invalid coordinates
+            NegativeCase.of("/api/v1/isCloseTo", "{\"position1\":{\"lng\":200,\"lat\":0},\"position2\":{\"lng\":0,\"lat\":0}}", 400, "isCloseInvalidCoords"),
+            // nextPosition: invalid coords
+            NegativeCase.of("/api/v1/nextPosition", "{\"start\":{\"lng\":200,\"lat\":0},\"angle\":0}", 400, "invalidStart"),
+            // nextPosition: invalid angle
+            NegativeCase.of("/api/v1/nextPosition", "{\"start\":{\"lng\":0,\"lat\":0},\"angle\":91}", 400, "invalidAngle"),
+            // nextPosition: missing angle (null)
+            NegativeCase.of("/api/v1/nextPosition", "{\"start\":{\"lng\":0,\"lat\":0},\"angle\":null}", 400, "invalidAngleNull"),
+            // nextPosition: missing start (null)
+            NegativeCase.of("/api/v1/nextPosition", "{\"start\":null,\"angle\":0}", 400, "missingStart"),
+            // isInRegion: invalid region vertices
+            NegativeCase.of("/api/v1/isInRegion", "{\"position\":{\"lng\":0,\"lat\":0},\"region\":{\"name\":\"x\",\"vertices\":[]}}", 400, "invalidVertices"),
+            // isInRegion: null vertices
+            NegativeCase.of("/api/v1/isInRegion", "{\"position\":{\"lng\":0,\"lat\":0},\"region\":{\"name\":\"x\",\"vertices\":null}}", 400, "nullVertices"),
+            // isInRegion: unclosed polygon
+            NegativeCase.of("/api/v1/isInRegion", "{\"position\":{\"lng\":0,\"lat\":0},\"region\":{\"name\":\"x\",\"vertices\":[{\"lng\":0,\"lat\":0},{\"lng\":1,\"lat\":0},{\"lng\":1,\"lat\":1}]}}", 400, "unclosedPolygon")
+        );
+    }
+
+    @ParameterizedTest(name = "negative case -> {3}")
+    @MethodSource("negativeCases")
+    @DisplayName("WebMvc: parameterized negative-path validation branches")
+    void negative_validation_paths(NegativeCase nc) throws Exception {
+        // Default stubs
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.areValidPositions(any(), any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        when(validationService.isValidAngle(any())).thenReturn(true);
+        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
+        when(validationService.isPolygonClosed(any())).thenReturn(true);
+
+        // Tailor stubs per scenario
+        switch (nc.scenario) {
+            case "invalidRequest" -> when(validationService.isValidRequest(any())).thenReturn(false);
+            case "invalidCoords" -> when(validationService.areValidPositions(any(), any())).thenReturn(false);
+            case "isCloseInvalidRequest" -> when(validationService.isValidRequest(any())).thenReturn(false);
+            case "isCloseInvalidCoords" -> when(validationService.areValidPositions(any(), any())).thenReturn(false);
+            case "invalidStart" -> when(validationService.isValidPosition(any())).thenReturn(false);
+            case "invalidAngle" -> when(validationService.isValidAngle(any())).thenReturn(false);
+            case "invalidAngleNull" -> when(validationService.isValidAngle(any())).thenReturn(false);
+            case "missingStart" -> when(validationService.isValidRequest(any())).thenReturn(true);
+            case "invalidVertices" -> when(validationService.hasValidRegionVertices(any())).thenReturn(false);
+            case "nullVertices" -> when(validationService.hasValidRegionVertices(any())).thenReturn(true);
+            case "unclosedPolygon" -> when(validationService.isPolygonClosed(any())).thenReturn(false);
+            default -> {}
+        }
+
+        mockMvc.perform(post(nc.path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(nc.body))
+                .andExpect(status().is(nc.expectedStatus));
+    }
+
+    private record NegativeCase(String path, String body, int expectedStatus, String scenario) {
+        static NegativeCase of(String path, String body, int expectedStatus, String scenario) {
+            return new NegativeCase(path, body, expectedStatus, scenario);
+        }
     }
 
     // ========== DISTANCE TO TESTS ==========
@@ -121,48 +382,28 @@ class ApiControllerWebMvcTest {
 
     // ========== IS CLOSE TO TESTS ==========
 
-    @Test
-    @DisplayName("POST /api/v1/isCloseTo - WebMvc: returns true for close points")
-    void isCloseTo_returnsTrue_forClosePoints() throws Exception {
-        // Given
+    @ParameterizedTest(name = "isCloseTo -> expected={2}")
+    @CsvSource({
+        "0.0,0.0, 0.0001,0.0001, true",
+        "0.0,0.0, 1.0,1.0, false"
+    })
+    @DisplayName("POST /api/v1/isCloseTo - WebMvc: parameterized close/distant cases")
+    void isCloseTo_parameterized(double lng1, double lat1, double lng2, double lat2, boolean expected) throws Exception {
         DistanceRequest request = new DistanceRequest();
-        LngLat p1 = new LngLat(0.0, 0.0);
-        LngLat p2 = new LngLat(0.0001, 0.0001);
+        LngLat p1 = new LngLat(lng1, lat1);
+        LngLat p2 = new LngLat(lng2, lat2);
         request.setPosition1(p1);
         request.setPosition2(p2);
-        
+
         when(validationService.isValidRequest(any())).thenReturn(true);
         when(validationService.areValidPositions(any(), any())).thenReturn(true);
-        when(distanceService.areClose(any(), any())).thenReturn(true);
+        when(distanceService.areClose(any(), any())).thenReturn(expected);
 
-        // When & Then
         mockMvc.perform(post("/api/v1/isCloseTo")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(content().string("true"));
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/isCloseTo - WebMvc: returns false for distant points")
-    void isCloseTo_returnsFalse_forDistantPoints() throws Exception {
-        // Given
-        DistanceRequest request = new DistanceRequest();
-        LngLat p1 = new LngLat(0.0, 0.0);
-        LngLat p2 = new LngLat(1.0, 1.0);
-        request.setPosition1(p1);
-        request.setPosition2(p2);
-        
-        when(validationService.isValidRequest(any())).thenReturn(true);
-        when(validationService.areValidPositions(any(), any())).thenReturn(true);
-        when(distanceService.areClose(any(), any())).thenReturn(false);
-
-        // When & Then
-        mockMvc.perform(post("/api/v1/isCloseTo")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(content().string("false"));
+                .andExpect(content().string(Boolean.toString(expected)));
     }
 
     // ========== NEXT POSITION TESTS ==========

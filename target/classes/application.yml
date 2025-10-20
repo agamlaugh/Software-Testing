@@ -1,6 +1,6 @@
 spring:
   application:
-    name: IlpTutorial_1
+    name: ilp_submission_1
 
 
 info:
