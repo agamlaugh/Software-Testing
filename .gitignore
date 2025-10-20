@@ -30,3 +30,8 @@ Thumbs.db
 # Build artifacts
 build/
 out/
+# ILP ignores
+*.tar
+ilp_submission_image.tar
+/target/
+.DS_Store
