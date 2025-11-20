@@ -57,8 +57,15 @@ public class ValidationService {
         if (angle == null || angle.isNaN() || angle.isInfinite()) {
             return false;
         }
-        double normalized = normalizeAngle(angle);
-        double steps = normalized / ANGLE_INCREMENT;
+        
+        // Reject angles outside the standard 0-360 degree range
+        // This treats values like 900° as semantically invalid
+        if (angle < 0 || angle >= 360) {
+            return false;
+        }
+        
+        // Check if angle is a valid 16-compass direction (multiple of 22.5°)
+        double steps = angle / ANGLE_INCREMENT;
         double nearest = Math.round(steps);
         return Math.abs(steps - nearest) <= ANGLE_EPSILON;
     }
@@ -119,13 +126,5 @@ public class ValidationService {
 
     private boolean doublesEqual(double a, double b) {
         return Math.abs(a - b) <= 1e-9;
-    }
-
-    private double normalizeAngle(double angle) {
-        double normalized = angle % 360.0;
-        if (normalized < 0) {
-            normalized += 360.0;
-        }
-        return normalized;
     }
 }
