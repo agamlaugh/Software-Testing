@@ -5,7 +5,6 @@ import uk.ac.ed.ilp.model.requests.DistanceRequest;
 import uk.ac.ed.ilp.model.requests.NextPositionRequest;
 import uk.ac.ed.ilp.model.requests.IsInRegionSpecRequest;
 import uk.ac.ed.ilp.model.Region;
-import uk.ac.ed.ilp.exception.InvalidCoordinatesException;
 import org.springframework.stereotype.Component;
 
 /**

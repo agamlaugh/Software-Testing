@@ -12,7 +12,14 @@ import uk.ac.ed.ilp.service.RegionService;
 import uk.ac.ed.ilp.service.DistanceService;
 import uk.ac.ed.ilp.service.PositionService;
 import uk.ac.ed.ilp.service.ValidationService;
+import uk.ac.ed.ilp.service.IlpRestClient;
+import uk.ac.ed.ilp.service.DroneQueryService;
 import uk.ac.ed.ilp.model.requests.IsInRegionSpecRequest;
+import uk.ac.ed.ilp.model.requests.QueryCondition;
+import uk.ac.ed.ilp.model.Drone;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -22,15 +29,20 @@ public class ApiController {
     private final DistanceService distanceService;
     private final PositionService positionService;
     private final ValidationService validationService;
+    private final IlpRestClient ilpRestClient;
+    private final DroneQueryService droneQueryService;
     private static final String STUDENT_ID = "s2490039";
 
     @Autowired
     public ApiController(RegionService regionService, DistanceService distanceService, 
-                        PositionService positionService, ValidationService validationService) {
+                        PositionService positionService, ValidationService validationService,
+                        IlpRestClient ilpRestClient, DroneQueryService droneQueryService) {
         this.regionService = regionService;
         this.distanceService = distanceService;
         this.positionService = positionService;
         this.validationService = validationService;
+        this.ilpRestClient = ilpRestClient;
+        this.droneQueryService = droneQueryService;
     }
 
     @GetMapping(value = "/uid", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -132,5 +144,82 @@ public class ApiController {
 
         boolean inside = regionService.contains(region.getVertices(), position);
         return ResponseEntity.ok(inside);
+    }
+    
+    @GetMapping(value = "/dronesWithCooling/{state}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<String>> dronesWithCooling(@PathVariable Boolean state) {
+        List<Drone> drones = ilpRestClient.fetchDrones();
+                List<String> droneIds = drones.stream()
+                .filter(drone -> drone != null && drone.getCapability() != null)
+                .filter(drone -> {
+                    Boolean cooling = drone.getCapability().getCooling();
+                    boolean hasCooling = Boolean.TRUE.equals(cooling);
+                    return hasCooling == state;
+                })
+                .map(Drone::getId)
+                .filter(id -> id != null)
+                .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(droneIds);
+    }
+
+    @GetMapping(value = "/droneDetails/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Drone> droneDetails(@PathVariable String id) {
+        List<Drone> drones = ilpRestClient.fetchDrones();
+        
+        // Find drone with matching ID
+        Drone drone = drones.stream()
+                .filter(d -> d != null && id.equals(d.getId()))
+                .findFirst()
+                .orElse(null);
+        
+        if (drone == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        return ResponseEntity.ok(drone);
+    }
+
+    /**
+     * Returns array of drone IDs where attribute equals value
+     * Single attribute query, always uses = operator
+     */
+    @GetMapping(value = "/queryAsPath/{attribute}/{value}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<String>> queryAsPath(
+            @PathVariable String attribute,
+            @PathVariable String value) {
+        
+        // Fetch fresh data from ILP REST service
+        List<Drone> drones = ilpRestClient.fetchDrones();
+        
+        // Delegate to service for query logic
+        List<String> droneIds = droneQueryService.queryByAttribute(drones, attribute, value);
+        
+        return ResponseEntity.ok(droneIds);
+    }
+
+    /**
+     * Returns array of drone IDs matching multiple conditions with operators
+     * All conditions joined by AND logic
+     * Supports operators: =, !=, <, > for numerical attributes; only = for boolean/string
+     */
+    @PostMapping(
+            value = "/query",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<List<String>> query(@RequestBody(required = false) List<QueryCondition> conditions) {
+        // Validate request
+        if (conditions == null || conditions.isEmpty()) {
+            return ResponseEntity.badRequest().body(List.of());
+        }
+        
+        // Fetch fresh data from ILP REST service
+        List<Drone> drones = ilpRestClient.fetchDrones();
+        
+        // Delegate to service for query logic (AND logic - all conditions must match)
+        List<String> droneIds = droneQueryService.queryByConditions(drones, conditions);
+        
+        return ResponseEntity.ok(droneIds);
     }
 }

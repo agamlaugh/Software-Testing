@@ -16,6 +16,8 @@ import uk.ac.ed.ilp.service.DistanceService;
 import uk.ac.ed.ilp.service.PositionService;
 import uk.ac.ed.ilp.service.RegionService;
 import uk.ac.ed.ilp.service.ValidationService;
+import uk.ac.ed.ilp.service.IlpRestClient;
+import uk.ac.ed.ilp.service.DroneQueryService;
 
 import java.util.Arrays;
 import java.util.List;
@@ -31,12 +33,14 @@ class ApiControllerMockitoTest {
     @Mock private PositionService positionService;
     @Mock private ValidationService validationService;
     @Mock private RegionService regionService;
+    @Mock private IlpRestClient ilpRestClient;
+    @Mock private DroneQueryService droneQueryService;
 
     private ApiController apiController;
 
     @BeforeEach
     void setup() {
-        apiController = new ApiController(regionService, distanceService, positionService, validationService);
+        apiController = new ApiController(regionService, distanceService, positionService, validationService, ilpRestClient, droneQueryService);
     }
 
     @Test
