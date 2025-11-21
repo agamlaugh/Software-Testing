@@ -14,9 +14,12 @@ import uk.ac.ed.ilp.service.PositionService;
 import uk.ac.ed.ilp.service.ValidationService;
 import uk.ac.ed.ilp.service.IlpRestClient;
 import uk.ac.ed.ilp.service.DroneQueryService;
+import uk.ac.ed.ilp.service.DroneAvailabilityService;
 import uk.ac.ed.ilp.model.requests.IsInRegionSpecRequest;
 import uk.ac.ed.ilp.model.requests.QueryCondition;
 import uk.ac.ed.ilp.model.Drone;
+import uk.ac.ed.ilp.model.MedDispatchRec;
+import uk.ac.ed.ilp.model.DroneForServicePoint;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,18 +34,21 @@ public class ApiController {
     private final ValidationService validationService;
     private final IlpRestClient ilpRestClient;
     private final DroneQueryService droneQueryService;
+    private final DroneAvailabilityService droneAvailabilityService;
     private static final String STUDENT_ID = "s2490039";
 
     @Autowired
     public ApiController(RegionService regionService, DistanceService distanceService, 
                         PositionService positionService, ValidationService validationService,
-                        IlpRestClient ilpRestClient, DroneQueryService droneQueryService) {
+                        IlpRestClient ilpRestClient, DroneQueryService droneQueryService,
+                        DroneAvailabilityService droneAvailabilityService) {
         this.regionService = regionService;
         this.distanceService = distanceService;
         this.positionService = positionService;
         this.validationService = validationService;
         this.ilpRestClient = ilpRestClient;
         this.droneQueryService = droneQueryService;
+        this.droneAvailabilityService = droneAvailabilityService;
     }
 
     @GetMapping(value = "/uid", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -219,6 +225,35 @@ public class ApiController {
         
         // Delegate to service for query logic (AND logic - all conditions must match)
         List<String> droneIds = droneQueryService.queryByConditions(drones, conditions);
+        
+        return ResponseEntity.ok(droneIds);
+    }
+
+    /**
+     * Returns array of drone IDs that can handle all dispatches
+     * All dispatches joined by AND logic - one drone must handle all
+     * Considers: capability requirements, date/time availability, service point availability
+     */
+    @PostMapping(
+            value = "/queryAvailableDrones",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<List<String>> queryAvailableDrones(
+            @RequestBody(required = false) List<MedDispatchRec> dispatches) {
+        
+        // Validate request
+        if (dispatches == null || dispatches.isEmpty()) {
+            return ResponseEntity.ok(List.of()); // Empty array per spec
+        }
+        
+        // Fetch fresh data from ILP REST service
+        List<Drone> drones = ilpRestClient.fetchDrones();
+        List<DroneForServicePoint> dronesForServicePoints = ilpRestClient.fetchDronesForServicePoints();
+        
+        // Find drones that can handle all dispatches
+        List<String> droneIds = droneAvailabilityService.findAvailableDrones(
+                dispatches, drones, dronesForServicePoints);
         
         return ResponseEntity.ok(droneIds);
     }

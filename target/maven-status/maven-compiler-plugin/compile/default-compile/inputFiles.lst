@@ -23,6 +23,7 @@
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/requests/NextPositionRequest.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/requests/QueryCondition.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/DistanceService.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/DroneAvailabilityService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/DroneQueryService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/IlpRestClient.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/PositionService.java
