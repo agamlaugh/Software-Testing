@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @Setter
 @NoArgsConstructor
 public class Drone {
-    private String id; // String type per Piazza @142, @148
+    private String id; 
     private String name;
     private DroneCapability capability;
 }

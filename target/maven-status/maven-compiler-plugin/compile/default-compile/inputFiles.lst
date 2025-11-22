@@ -6,11 +6,14 @@
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/exception/InvalidCoordinatesException.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/exception/InvalidRegionException.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/mapper/PositionMapper.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DeliveryPath.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DeliveryPathResponse.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/Drone.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DroneAvailability.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DroneAvailabilityInfo.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DroneCapability.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DroneForServicePoint.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DronePath.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/LngLat.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/LngLatAlt.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/MedDispatchRec.java
@@ -22,10 +25,12 @@
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/requests/IsInRegionSpecRequest.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/requests/NextPositionRequest.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/requests/QueryCondition.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/DeliveryPathService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/DistanceService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/DroneAvailabilityService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/DroneQueryService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/IlpRestClient.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/PathfindingService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/PositionService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/RegionService.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/service/ValidationService.java

@@ -1,4 +1,5 @@
 uk/ac/ed/ilp/integration/ApiControllerParamTests.class
+uk/ac/ed/ilp/unit/ApiControllerMockitoTest.class
 uk/ac/ed/ilp/integration/ApiControllerParamTests$TestCase.class
 uk/ac/ed/ilp/unit/IlpExceptionHandlerTest.class
 uk/ac/ed/ilp/unit/PositionMapperTest.class

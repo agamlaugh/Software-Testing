@@ -15,11 +15,15 @@ import uk.ac.ed.ilp.service.ValidationService;
 import uk.ac.ed.ilp.service.IlpRestClient;
 import uk.ac.ed.ilp.service.DroneQueryService;
 import uk.ac.ed.ilp.service.DroneAvailabilityService;
+import uk.ac.ed.ilp.service.DeliveryPathService;
 import uk.ac.ed.ilp.model.requests.IsInRegionSpecRequest;
 import uk.ac.ed.ilp.model.requests.QueryCondition;
 import uk.ac.ed.ilp.model.Drone;
 import uk.ac.ed.ilp.model.MedDispatchRec;
 import uk.ac.ed.ilp.model.DroneForServicePoint;
+import uk.ac.ed.ilp.model.DeliveryPathResponse;
+import uk.ac.ed.ilp.model.ServicePoint;
+import uk.ac.ed.ilp.model.RestrictedArea;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,13 +39,15 @@ public class ApiController {
     private final IlpRestClient ilpRestClient;
     private final DroneQueryService droneQueryService;
     private final DroneAvailabilityService droneAvailabilityService;
+    private final DeliveryPathService deliveryPathService;
     private static final String STUDENT_ID = "s2490039";
 
     @Autowired
     public ApiController(RegionService regionService, DistanceService distanceService, 
                         PositionService positionService, ValidationService validationService,
                         IlpRestClient ilpRestClient, DroneQueryService droneQueryService,
-                        DroneAvailabilityService droneAvailabilityService) {
+                        DroneAvailabilityService droneAvailabilityService,
+                        DeliveryPathService deliveryPathService) {
         this.regionService = regionService;
         this.distanceService = distanceService;
         this.positionService = positionService;
@@ -49,6 +55,7 @@ public class ApiController {
         this.ilpRestClient = ilpRestClient;
         this.droneQueryService = droneQueryService;
         this.droneAvailabilityService = droneAvailabilityService;
+        this.deliveryPathService = deliveryPathService;
     }
 
     @GetMapping(value = "/uid", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -256,5 +263,35 @@ public class ApiController {
                 dispatches, drones, dronesForServicePoints);
         
         return ResponseEntity.ok(droneIds);
+    }
+
+    /**
+     * Calculate delivery paths for dispatches
+     * Returns optimal routes with flight paths, total moves, and total cost
+     */
+    @PostMapping(
+            value = "/calcDeliveryPath",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<DeliveryPathResponse> calcDeliveryPath(
+            @RequestBody(required = false) List<MedDispatchRec> dispatches) {
+        
+        // Validate request
+        if (dispatches == null || dispatches.isEmpty()) {
+            return ResponseEntity.ok(new DeliveryPathResponse(0.0, 0, List.of()));
+        }
+        
+        // Fetch fresh data from ILP REST service
+        List<Drone> drones = ilpRestClient.fetchDrones();
+        List<ServicePoint> servicePoints = ilpRestClient.fetchServicePoints();
+        List<DroneForServicePoint> dronesForServicePoints = ilpRestClient.fetchDronesForServicePoints();
+        List<RestrictedArea> restrictedAreas = ilpRestClient.fetchRestrictedAreas();
+        
+        // Calculate delivery paths
+        DeliveryPathResponse response = deliveryPathService.calculateDeliveryPaths(
+                dispatches, drones, servicePoints, dronesForServicePoints, restrictedAreas);
+        
+        return ResponseEntity.ok(response);
     }
 }

@@ -95,4 +95,166 @@ Content-Type: application/json
   }
 ]
 
+### ============================================
+### CW2 Endpoints - Drone Availability (Endpoint 4)
+### ============================================
+
+### 4: Query available drones - Single dispatch with date/time
+POST http://localhost:8080/api/v1/queryAvailableDrones
+Content-Type: application/json
+
+[
+  {
+    "id": 1,
+    "date": "2025-12-22",
+    "time": "14:30",
+    "requirements": {
+      "capacity": 8.0,
+      "cooling": true
+    },
+    "delivery": {
+      "lng": -3.188,
+      "lat": 55.944
+    }
+  }
+]
+
+### 4: Query available drones - Single dispatch without date/time
+POST http://localhost:8080/api/v1/queryAvailableDrones
+Content-Type: application/json
+
+[
+  {
+    "id": 2,
+    "requirements": {
+      "capacity": 4.0,
+      "cooling": true
+    },
+    "delivery": {
+      "lng": -3.188,
+      "lat": 55.944
+    }
+  }
+]
+
+### 4: Query available drones - Multiple dispatches (AND logic)
+POST http://localhost:8080/api/v1/queryAvailableDrones
+Content-Type: application/json
+
+[
+  {
+    "id": 3,
+    "date": "2025-12-22",
+    "time": "14:30",
+    "requirements": {
+      "capacity": 8.0,
+      "cooling": true
+    },
+    "delivery": {
+      "lng": -3.188,
+      "lat": 55.944
+    }
+  },
+  {
+    "id": 4,
+    "date": "2025-12-22",
+    "time": "15:00",
+    "requirements": {
+      "capacity": 4.0,
+      "heating": true
+    },
+    "delivery": {
+      "lng": -3.189,
+      "lat": 55.945
+    }
+  }
+]
+
+### 4: Query available drones - With heating requirement
+POST http://localhost:8080/api/v1/queryAvailableDrones
+Content-Type: application/json
+
+[
+  {
+    "id": 5,
+    "requirements": {
+      "capacity": 8.0,
+      "heating": true
+    },
+    "delivery": {
+      "lng": -3.188,
+      "lat": 55.944
+    }
+  }
+]
+
+### 4: Query available drones - Empty array (should return empty)
+POST http://localhost:8080/api/v1/queryAvailableDrones
+Content-Type: application/json
+
+[]
+
+### ============================================
+### CW2 Endpoints - Path Calculation (Endpoint 5a)
+### ============================================
+
+### 5a: Calculate delivery path - Single dispatch
+POST http://localhost:8080/api/v1/calcDeliveryPath
+Content-Type: application/json
+
+[
+  {
+    "id": 1,
+    "date": "2025-12-22",
+    "time": "14:30",
+    "requirements": {
+      "capacity": 8.0,
+      "cooling": true
+    },
+    "delivery": {
+      "lng": -3.188,
+      "lat": 55.944
+    }
+  }
+]
+
+### 5a: Calculate delivery path - Multiple dispatches
+POST http://localhost:8080/api/v1/calcDeliveryPath
+Content-Type: application/json
+
+[
+  {
+    "id": 1,
+    "date": "2025-12-22",
+    "time": "14:30",
+    "requirements": {
+      "capacity": 8.0,
+      "cooling": true
+    },
+    "delivery": {
+      "lng": -3.188,
+      "lat": 55.944
+    }
+  },
+  {
+    "id": 2,
+    "date": "2025-12-22",
+    "time": "15:00",
+    "requirements": {
+      "capacity": 4.0,
+      "heating": true
+    },
+    "delivery": {
+      "lng": -3.189,
+      "lat": 55.945
+    }
+  }
+]
+
+### 5a: Calculate delivery path - Empty array (should return empty)
+POST http://localhost:8080/api/v1/calcDeliveryPath
+Content-Type: application/json
+
+[]
+
 ###

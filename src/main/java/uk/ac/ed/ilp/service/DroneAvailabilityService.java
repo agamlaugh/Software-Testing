@@ -257,13 +257,8 @@ public class DroneAvailabilityService {
         }
         
         // Check if time is within slot
-        // "from" is inclusive, "until" is typically exclusive (but handle edge case where until is 00:00:00 next day)
-        if (untilTime.equals(LocalTime.MIDNIGHT)) {
-            // If until is midnight, it means until end of day (23:59:59.999...)
-            return !time.isBefore(fromTime);
-        }
-        // Normal case: from <= time < until
-        return !time.isBefore(fromTime) && time.isBefore(untilTime);
+        // from <= time <= until (both inclusive)
+        return !time.isBefore(fromTime) && !time.isAfter(untilTime);
     }
 }
 
