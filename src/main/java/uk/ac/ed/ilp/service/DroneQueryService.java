@@ -102,12 +102,26 @@ public class DroneQueryService {
         
         DroneCapability cap = drone.getCapability();
         
-        // Boolean attributes (cooling, heating) - only support =
+        // Boolean attributes (cooling, heating) - support = and !=
         if ("cooling".equalsIgnoreCase(attribute) || "heating".equalsIgnoreCase(attribute)) {
             if ("=".equals(operator)) {
                 return matchesAttribute(drone, attribute, value);
             }
-            return false; // Only = supported for boolean attributes
+            if ("!=".equals(operator)) {
+                // != means opposite of the value
+                boolean valueBool = Boolean.parseBoolean(value);
+                if ("cooling".equalsIgnoreCase(attribute)) {
+                    Boolean cooling = cap.getCooling();
+                    boolean hasCooling = Boolean.TRUE.equals(cooling);
+                    return hasCooling != valueBool;
+                }
+                if ("heating".equalsIgnoreCase(attribute)) {
+                    Boolean heating = cap.getHeating();
+                    boolean hasHeating = Boolean.TRUE.equals(heating);
+                    return hasHeating != valueBool;
+                }
+            }
+            return false; // Only = and != supported for boolean attributes
         }
         
         // Numeric attributes support =, !=, <, >

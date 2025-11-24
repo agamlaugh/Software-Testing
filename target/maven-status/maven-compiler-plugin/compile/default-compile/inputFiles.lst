@@ -14,6 +14,10 @@
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DroneCapability.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DroneForServicePoint.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/DronePath.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/GeoJsonFeature.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/GeoJsonFeatureCollection.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/GeoJsonGeometry.java
+/Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/GeoJsonProperties.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/LngLat.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/LngLatAlt.java
 /Users/agamcohen/Desktop/ilp_submission_1/src/main/java/uk/ac/ed/ilp/model/MedDispatchRec.java

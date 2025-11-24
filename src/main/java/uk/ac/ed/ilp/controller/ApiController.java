@@ -24,8 +24,15 @@ import uk.ac.ed.ilp.model.DroneForServicePoint;
 import uk.ac.ed.ilp.model.DeliveryPathResponse;
 import uk.ac.ed.ilp.model.ServicePoint;
 import uk.ac.ed.ilp.model.RestrictedArea;
+import uk.ac.ed.ilp.model.GeoJsonFeatureCollection;
+import uk.ac.ed.ilp.model.GeoJsonFeature;
+import uk.ac.ed.ilp.model.GeoJsonGeometry;
+import uk.ac.ed.ilp.model.GeoJsonProperties;
+import uk.ac.ed.ilp.model.DronePath;
+import uk.ac.ed.ilp.model.DeliveryPath;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @RestController
@@ -256,11 +263,12 @@ public class ApiController {
         
         // Fetch fresh data from ILP REST service
         List<Drone> drones = ilpRestClient.fetchDrones();
+        List<ServicePoint> servicePoints = ilpRestClient.fetchServicePoints();
         List<DroneForServicePoint> dronesForServicePoints = ilpRestClient.fetchDronesForServicePoints();
         
         // Find drones that can handle all dispatches
         List<String> droneIds = droneAvailabilityService.findAvailableDrones(
-                dispatches, drones, dronesForServicePoints);
+                dispatches, drones, dronesForServicePoints, servicePoints);
         
         return ResponseEntity.ok(droneIds);
     }
@@ -293,5 +301,92 @@ public class ApiController {
                 dispatches, drones, servicePoints, dronesForServicePoints, restrictedAreas);
         
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Calculate delivery paths and return as GeoJSON
+     * Same as calcDeliveryPath but returns GeoJSON format (FeatureCollection with LineString)
+     * Always solvable by one drone
+     */
+    @PostMapping(
+            value = "/calcDeliveryPathAsGeoJson",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<GeoJsonFeatureCollection> calcDeliveryPathAsGeoJson(
+            @RequestBody(required = false) List<MedDispatchRec> dispatches) {
+        
+        // Validate request
+        if (dispatches == null || dispatches.isEmpty()) {
+            return ResponseEntity.ok(new GeoJsonFeatureCollection("FeatureCollection", List.of()));
+        }
+        
+        // Fetch fresh data from ILP REST service
+        List<Drone> drones = ilpRestClient.fetchDrones();
+        List<ServicePoint> servicePoints = ilpRestClient.fetchServicePoints();
+        List<DroneForServicePoint> dronesForServicePoints = ilpRestClient.fetchDronesForServicePoints();
+        List<RestrictedArea> restrictedAreas = ilpRestClient.fetchRestrictedAreas();
+        
+        // Calculate delivery paths (reuse calcDeliveryPath logic)
+        DeliveryPathResponse response = deliveryPathService.calculateDeliveryPaths(
+                dispatches, drones, servicePoints, dronesForServicePoints, restrictedAreas);
+        
+        // Transform to GeoJSON format
+        GeoJsonFeatureCollection geoJson = transformToGeoJson(response);
+        
+        return ResponseEntity.ok(geoJson);
+    }
+    
+    /**
+     * Transform DeliveryPathResponse to GeoJSON FeatureCollection
+     * Combines all flight paths into LineString features
+     */
+    private GeoJsonFeatureCollection transformToGeoJson(DeliveryPathResponse response) {
+        if (response == null || response.getDronePaths() == null || response.getDronePaths().isEmpty()) {
+            return new GeoJsonFeatureCollection("FeatureCollection", List.of());
+        }
+        
+        List<GeoJsonFeature> features = new ArrayList<>();
+        
+        // For each drone path, create a GeoJSON feature
+        for (DronePath dronePath : response.getDronePaths()) {
+            // Combine all flight paths from all deliveries into one LineString
+            List<List<Double>> coordinates = new ArrayList<>();
+            List<Integer> deliveryIds = new ArrayList<>();
+            
+            for (DeliveryPath delivery : dronePath.getDeliveries()) {
+                if (delivery.getFlightPath() != null) {
+                    // Add delivery ID
+                    if (delivery.getDeliveryId() != null) {
+                        deliveryIds.add(delivery.getDeliveryId());
+                    }
+                    
+                    // Add coordinates (skip first point if not first delivery to avoid duplicates)
+                    boolean isFirstDelivery = coordinates.isEmpty();
+                    for (int i = 0; i < delivery.getFlightPath().size(); i++) {
+                        if (isFirstDelivery || i > 0) {
+                            LngLat point = delivery.getFlightPath().get(i);
+                            coordinates.add(List.of(point.getLng(), point.getLat()));
+                        }
+                    }
+                }
+            }
+            
+            // Create GeoJSON geometry
+            GeoJsonGeometry geometry = new GeoJsonGeometry("LineString", coordinates);
+            
+            // Create properties
+            GeoJsonProperties properties = new GeoJsonProperties();
+            properties.setDroneId(dronePath.getDroneId());
+            properties.setDeliveryIds(deliveryIds);
+            properties.setTotalMoves(response.getTotalMoves());
+            properties.setTotalCost(response.getTotalCost());
+            
+            // Create feature
+            GeoJsonFeature feature = new GeoJsonFeature("Feature", geometry, properties);
+            features.add(feature);
+        }
+        
+        return new GeoJsonFeatureCollection("FeatureCollection", features);
     }
 }
