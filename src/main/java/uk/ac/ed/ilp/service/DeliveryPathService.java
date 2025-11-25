@@ -40,11 +40,85 @@ public class DeliveryPathService {
             return new DeliveryPathResponse(0.0, 0, List.of());
         }
 
-        // Find available drones that can handle all dispatches
+        // Check if dispatches have different dates
+        Set<String> uniqueDates = dispatches.stream()
+                .filter(d -> d.getDate() != null)
+                .map(MedDispatchRec::getDate)
+                .collect(Collectors.toSet());
+        
+        // If multiple dates, group by date and process separately (per Piazza @150)
+        if (uniqueDates.size() > 1) {
+            return calculateMultiDroneSolution(
+                    dispatches, allDrones, servicePoints, dronesForServicePoints, restrictedAreas);
+        }
+
+        // Single date: Try to find a single drone that can handle all dispatches
         List<String> availableDroneIds = droneAvailabilityService.findAvailableDrones(
                 dispatches, allDrones, dronesForServicePoints, servicePoints);
 
-        System.out.println("[DEBUG] Found " + availableDroneIds.size() + " potential drones for single-drone solution: " + availableDroneIds);
+        DeliveryPathResponse bestSolution = null;
+        double bestCost = Double.MAX_VALUE;
+
+        for (String droneId : availableDroneIds) {
+            Drone drone = allDrones.stream()
+                    .filter(d -> droneId.equals(d.getId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (drone == null) continue;
+
+            // Find service point for this drone
+            ServicePoint servicePoint = findServicePointForDrone(droneId, servicePoints, dronesForServicePoints);
+            if (servicePoint == null) {
+                continue;
+            }
+
+            // Calculate path for all dispatches using Greedy TSP ordering
+            DeliveryPathResponse solution = calculatePathForDrone(
+                    drone, servicePoint, new ArrayList<>(dispatches), restrictedAreas);
+
+            if (solution == null) {
+                continue;
+            }
+            
+            // Check max moves
+            if (drone.getCapability() != null && solution.getTotalMoves() > drone.getCapability().getMaxMoves()) {
+                continue;
+            }
+
+            if (solution.getTotalCost() < bestCost) {
+                bestCost = solution.getTotalCost();
+                bestSolution = solution;
+            }
+        }
+
+        // If no single drone can handle all, try multiple drones
+        if (bestSolution == null) {
+            bestSolution = calculateMultiDroneSolution(
+                    dispatches, allDrones, servicePoints, dronesForServicePoints, restrictedAreas);
+        }
+
+        return bestSolution != null ? bestSolution : new DeliveryPathResponse(0.0, 0, List.of());
+    }
+    
+    /**
+     * Calculate delivery paths using only single-drone solutions
+     * Returns null if no single-drone solution exists
+     */
+    public DeliveryPathResponse calculateSingleDroneOnly(
+            List<MedDispatchRec> dispatches,
+            List<Drone> allDrones,
+            List<ServicePoint> servicePoints,
+            List<DroneForServicePoint> dronesForServicePoints,
+            List<RestrictedArea> restrictedAreas) {
+
+        if (dispatches == null || dispatches.isEmpty()) {
+            return new DeliveryPathResponse(0.0, 0, List.of());
+        }
+
+        // Find available drones that can handle all dispatches
+        List<String> availableDroneIds = droneAvailabilityService.findAvailableDrones(
+                dispatches, allDrones, dronesForServicePoints, servicePoints);
 
         // Try to find a single drone that can handle all dispatches
         DeliveryPathResponse bestSolution = null;
@@ -60,44 +134,28 @@ public class DeliveryPathService {
 
             // Find service point for this drone
             ServicePoint servicePoint = findServicePointForDrone(droneId, servicePoints, dronesForServicePoints);
-            if (servicePoint == null) {
-                System.out.println("[DEBUG] Drone " + droneId + " skipped: No ServicePoint found");
-                continue;
-            }
-
-            System.out.println("[DEBUG] Trying drone " + droneId + " from " + servicePoint.getName() + " (MaxMoves: " + drone.getCapability().getMaxMoves() + ")");
+            if (servicePoint == null) continue;
 
             // Calculate path for all dispatches using Greedy TSP ordering
             DeliveryPathResponse solution = calculatePathForDrone(
                     drone, servicePoint, new ArrayList<>(dispatches), restrictedAreas);
 
-            if (solution == null) {
-                System.out.println("[DEBUG] Drone " + droneId + " failed: path calculation returned null (unreachable, return path failed, or cost > maxCost)");
-                continue;
-            }
+            if (solution == null) continue;
             
             // Check max moves
-            if (solution.getTotalMoves() > drone.getCapability().getMaxMoves()) {
-                System.out.println("[DEBUG] Drone " + droneId + " failed: Total Moves " + solution.getTotalMoves() + " > Max " + drone.getCapability().getMaxMoves());
+            if (drone.getCapability() != null && solution.getTotalMoves() > drone.getCapability().getMaxMoves()) {
                 continue;
             }
-            
-            System.out.println("[DEBUG] Drone " + droneId + " VALID solution found! Cost: " + solution.getTotalCost() + ", Moves: " + solution.getTotalMoves());
 
+            // Found a valid single-drone solution
             if (solution.getTotalCost() < bestCost) {
                 bestCost = solution.getTotalCost();
                 bestSolution = solution;
             }
         }
 
-        // If no single drone can handle all, try multiple drones
-        if (bestSolution == null) {
-            System.out.println("[DEBUG] No single drone solution found. Attempting multi-drone solution...");
-            bestSolution = calculateMultiDroneSolution(
-                    dispatches, allDrones, servicePoints, dronesForServicePoints, restrictedAreas);
-        }
-
-        return bestSolution != null ? bestSolution : new DeliveryPathResponse(0.0, 0, List.of());
+        // Return single-drone solution or null (no multi-drone fallback)
+        return bestSolution;
     }
 
     /**
@@ -145,16 +203,12 @@ public class DeliveryPathService {
                     currentPosition, deliveryLocation, restrictedAreas);
 
             if (pathToDelivery.isEmpty()) {
-                System.out.println("[DEBUG] A* Failed: Cannot find path from " + currentPosition.getLng() + "," + currentPosition.getLat() + 
-                                   " to " + deliveryLocation.getLng() + "," + deliveryLocation.getLat());
                 return null; // Unreachable
             }
 
             // Validate path completeness
             LngLat lastPoint = pathToDelivery.get(pathToDelivery.size() - 1);
             if (!distanceService.areClose(lastPoint, deliveryLocation)) {
-                System.out.println("[DEBUG] A* Failed: Path incomplete. Last point " + lastPoint.getLng() + "," + lastPoint.getLat() + 
-                                   " is not close to " + deliveryLocation.getLng() + "," + deliveryLocation.getLat());
                 return null;
             }
 
@@ -183,7 +237,6 @@ public class DeliveryPathService {
         if (!pathBack.isEmpty() && !deliveryPaths.isEmpty()) {
             LngLat lastReturnPoint = pathBack.get(pathBack.size() - 1);
             if (!distanceService.areClose(lastReturnPoint, startPoint)) {
-                System.out.println("[DEBUG] A* Failed: Cannot find return path to " + startPoint);
                 return null;
             }
             
@@ -213,35 +266,25 @@ public class DeliveryPathService {
         }
 
         // Validate max moves
-        if (totalMoves > drone.getCapability().getMaxMoves()) {
+        if (drone.getCapability() != null && totalMoves > drone.getCapability().getMaxMoves()) {
             return null;
         }
 
         // Calculate cost
         double cost = calculateCost(drone, totalMoves);
         
-        // Check maxCost validation (pooled budget for multi-delivery)
-        // For a single delivery, this checks cost <= maxCost.
-        // For multiple deliveries, we sum the maxCosts to create a pooled budget.
-        double totalMaxBudget = 0.0;
-        boolean anyMaxCostDefined = false;
-        
-        for (MedDispatchRec dispatch : dispatches) {
-            if (dispatch.getRequirements() != null && dispatch.getRequirements().getMaxCost() != null) {
-                totalMaxBudget += dispatch.getRequirements().getMaxCost();
-                anyMaxCostDefined = true;
-            } else {
-                // If a dispatch has no maxCost limit, we can assume it can accept any cost?
-                // Or strictly follow provided limits? 
-                // For safety, we'll assume missing maxCost doesn't contribute to the limit (conservative)
-                // unless we decide otherwise.
-            }
-        }
-
-        if (anyMaxCostDefined) {
-            if (cost > totalMaxBudget) {
-                System.out.println("[DEBUG] Cost Check Failed: Total Cost " + cost + " > Pooled Budget " + totalMaxBudget);
-                return null;
+        // Check maxCost validation (per delivery)
+        // EACH delivery's cost per delivery must be <= its maxCost
+        int numDeliveries = dispatches.size();
+        if (numDeliveries > 0) {
+            double costPerDelivery = cost / numDeliveries;
+            
+            for (MedDispatchRec dispatch : dispatches) {
+                if (dispatch.getRequirements() != null && dispatch.getRequirements().getMaxCost() != null) {
+                    if (costPerDelivery > dispatch.getRequirements().getMaxCost()) {
+                        return null;
+                    }
+                }
             }
         }
 
@@ -286,25 +329,94 @@ public class DeliveryPathService {
 
         for (List<MedDispatchRec> dateDispatches : dispatchesByDate.values()) {
             
-            // Get all available drones for this date (that can handle at least one dispatch)
-            // Ideally, we sort drones by capacity descending to use big drones first
-            List<String> potentialDroneIds = new ArrayList<>();
+            // For multi-drone scenarios, we need to consider ALL drones available at the date/time
+            // with the right capabilities, not just those that can handle a delivery individually.
+            // This is because maxCost per delivery changes when deliveries are combined.
+            
+            // Get common date/time for all dispatches (they should all be the same date)
+            String commonDate = dateDispatches.stream()
+                    .filter(d -> d.getDate() != null)
+                    .map(MedDispatchRec::getDate)
+                    .findFirst()
+                    .orElse(null);
+            String commonTime = dateDispatches.stream()
+                    .filter(d -> d.getTime() != null)
+                    .map(MedDispatchRec::getTime)
+                    .findFirst()
+                    .orElse(null);
+            
+            // Get all drones that:
+            // 1. Are available at service points
+            // 2. Are available at the date/time (if provided)
+            // 3. Have capabilities matching at least one dispatch (heating/cooling, ignoring maxCost for now)
+            Set<String> requiredCapabilities = new HashSet<>();
             for (MedDispatchRec d : dateDispatches) {
-                potentialDroneIds.addAll(droneAvailabilityService.findAvailableDrones(
-                        List.of(d), allDrones, dronesForServicePoints, servicePoints));
+                if (d.getRequirements() != null) {
+                    if (Boolean.TRUE.equals(d.getRequirements().getHeating())) {
+                        requiredCapabilities.add("heating");
+                    }
+                    if (Boolean.TRUE.equals(d.getRequirements().getCooling())) {
+                        requiredCapabilities.add("cooling");
+                    }
+                }
             }
             
+            // Filter drones: must be available at date/time and have required capabilities
             List<Drone> availableDrones = allDrones.stream()
-                    .filter(d -> potentialDroneIds.contains(d.getId()))
+                    .filter(drone -> {
+                        // Check if drone is available at service points
+                        if (findServicePointForDrone(drone.getId(), servicePoints, dronesForServicePoints) == null) {
+                            return false;
+                        }
+                        
+                        // Check date/time availability if provided
+                        if (commonDate != null && commonTime != null) {
+                            if (!droneAvailabilityService.isDroneAvailableAtDateTime(
+                                    drone, commonDate, commonTime, dronesForServicePoints)) {
+                                return false;
+                            }
+                        }
+                        
+                        // Check if drone has required capabilities
+                        // IMPORTANT: If we have both heating and cooling requirements, we need drones that can handle
+                        // at least ONE of them (they'll be assigned separately). If we only have one type of requirement,
+                        // the drone must have that capability.
+                        if (drone.getCapability() != null) {
+                            boolean hasHeatingReq = requiredCapabilities.contains("heating");
+                            boolean hasCoolingReq = requiredCapabilities.contains("cooling");
+                            boolean droneHasHeating = Boolean.TRUE.equals(drone.getCapability().getHeating());
+                            boolean droneHasCooling = Boolean.TRUE.equals(drone.getCapability().getCooling());
+                            
+                            // If we have both heating and cooling requirements, drone must have at least one
+                            if (hasHeatingReq && hasCoolingReq) {
+                                if (!droneHasHeating && !droneHasCooling) {
+                                    return false; // Drone has neither, can't help
+                                }
+                                // Drone has at least one - it can handle deliveries that match its capability
+                            } else if (hasHeatingReq) {
+                                // Only heating required - drone must have heating
+                                if (!droneHasHeating) {
+                                    return false;
+                                }
+                            } else if (hasCoolingReq) {
+                                // Only cooling required - drone must have cooling
+                                if (!droneHasCooling) {
+                                    return false;
+                                }
+                            }
+                        }
+                        
+                        return true;
+                    })
                     .distinct()
                     .sorted((d1, d2) -> {
                         // Sort by capacity descending
-                        Double c1 = d1.getCapability().getCapacity();
-                        Double c2 = d2.getCapability().getCapacity();
+                        Double c1 = (d1.getCapability() != null) ? d1.getCapability().getCapacity() : null;
+                        Double c2 = (d2.getCapability() != null) ? d2.getCapability().getCapacity() : null;
                         return Double.compare(c2 == null ? 0 : c2, c1 == null ? 0 : c1);
                     })
                     .collect(Collectors.toList());
-
+            
             List<MedDispatchRec> unassigned = new ArrayList<>(dateDispatches);
             
             for (Drone drone : availableDrones) {
@@ -315,38 +427,35 @@ public class DeliveryPathService {
 
                 List<MedDispatchRec> assignedToThisDrone = new ArrayList<>();
                 
-                // --- GREEDY PACKING ---
-                // 1. Find nearest dispatch to start
-                // 2. Try to add it. If valid path & valid cost/capacity -> keep it.
-                // 3. Repeat for next nearest from current location.
+                // --- IMPROVED GREEDY PACKING ---
+                // Problem: Individual deliveries might fail maxCost check, but combinations work
+                // Solution: Try to find the largest valid subset of remaining deliveries
                 
-                // We build the route incrementally
                 List<MedDispatchRec> candidates = new ArrayList<>(unassigned);
                 List<MedDispatchRec> currentRoute = new ArrayList<>();
                 
+                // Strategy: Try to find the largest subset that works together
+                // Start by trying all remaining deliveries together, then reduce if needed
                 while (!candidates.isEmpty()) {
-                    // Calculate path for current route to check feasibility
-                    // This is expensive but ensures validity
-                    
-                    // Pick nearest neighbor to add to route
-                    MedDispatchRec bestCandidate = null;
-                    // (Simplified: just iterate and try to add)
-                    // For true greedy, we should calculate distance from last point
-                    
-                    // Let's iterate through candidates and try to add the first one that fits
-                    // Optimization: Sort candidates by distance from Service Point (initially) or last delivery
-                    
-                    // Just try to pack as many as possible
-                    Iterator<MedDispatchRec> it = candidates.iterator();
-                    while (it.hasNext()) {
-                        MedDispatchRec candidate = it.next();
-                        List<MedDispatchRec> trialRoute = new ArrayList<>(currentRoute);
-                        trialRoute.add(candidate);
+                    // Try to add deliveries one at a time first (greedy)
+                    boolean addedSomething = true;
+                    while (!candidates.isEmpty() && addedSomething) {
+                        addedSomething = false;
                         
-                        // Check Capacity
-                        if (droneAvailabilityService.canDroneHandleDispatches(
-                                drone, trialRoute, dronesForServicePoints, servicePoints)) {
-                                    
+                        Iterator<MedDispatchRec> it = candidates.iterator();
+                        while (it.hasNext()) {
+                            MedDispatchRec candidate = it.next();
+                            List<MedDispatchRec> trialRoute = new ArrayList<>(currentRoute);
+                            trialRoute.add(candidate);
+                            
+                            // Check Capacity and other requirements
+                            String failureReason = droneAvailabilityService.canDroneHandleDispatchesWithReason(
+                                    drone, trialRoute, dronesForServicePoints, servicePoints);
+                            
+                            if (failureReason != null) {
+                                continue; // Skip this candidate
+                            }
+                                        
                             // Check Path feasibility (moves & maxCost)
                             DeliveryPathResponse trialSolution = calculatePathForDrone(
                                     drone, servicePoint, trialRoute, restrictedAreas);
@@ -354,13 +463,63 @@ public class DeliveryPathService {
                             if (trialSolution != null) {
                                 // It fits!
                                 currentRoute.add(candidate);
-                                it.remove(); // Remove from candidates for this drone
-                                // Also remove from main unassigned list later
+                                it.remove();
+                                addedSomething = true;
                             }
                         }
                     }
-                    // If we couldn't add any more candidates, break loop for this drone
-                    break; 
+                    
+                    // If we couldn't add any single delivery, try combinations
+                    // This handles the case where individual deliveries fail maxCost but combinations work
+                    if (currentRoute.isEmpty() && !candidates.isEmpty()) {
+                        // Try all remaining candidates together
+                        String failureReason = droneAvailabilityService.canDroneHandleDispatchesWithReason(
+                                drone, candidates, dronesForServicePoints, servicePoints);
+                        
+                        if (failureReason == null) {
+                            DeliveryPathResponse trialSolution = calculatePathForDrone(
+                                    drone, servicePoint, candidates, restrictedAreas);
+                            
+                            if (trialSolution != null) {
+                                // All remaining candidates work together!
+                                currentRoute.addAll(candidates);
+                                candidates.clear();
+                                break;
+                            }
+                        }
+                        
+                        // If all together doesn't work, try pairs
+                        boolean foundPair = false;
+                        for (int i = 0; i < candidates.size() && !foundPair; i++) {
+                            for (int j = i + 1; j < candidates.size() && !foundPair; j++) {
+                                MedDispatchRec d1 = candidates.get(i);
+                                MedDispatchRec d2 = candidates.get(j);
+                                List<MedDispatchRec> pair = List.of(d1, d2);
+                                
+                                failureReason = droneAvailabilityService.canDroneHandleDispatchesWithReason(
+                                        drone, pair, dronesForServicePoints, servicePoints);
+                                
+                                if (failureReason == null) {
+                                    DeliveryPathResponse pairSolution = calculatePathForDrone(
+                                            drone, servicePoint, pair, restrictedAreas);
+                                    
+                                    if (pairSolution != null) {
+                                        currentRoute.addAll(pair);
+                                        candidates.removeAll(pair);
+                                        foundPair = true;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // If no combination works, break
+                        if (!foundPair) {
+                            break;
+                        }
+                    } else {
+                        // We added something, break to process this route
+                        break;
+                    }
                 }
                 
                 if (!currentRoute.isEmpty()) {
@@ -371,12 +530,17 @@ public class DeliveryPathService {
                     // Calculate final solution for this drone
                     DeliveryPathResponse droneSolution = calculatePathForDrone(
                             drone, servicePoint, currentRoute, restrictedAreas);
+                    
+                    if (droneSolution == null) {
+                        continue;
+                    }
                             
                     allDronePaths.addAll(droneSolution.getDronePaths());
                     totalCost += droneSolution.getTotalCost();
                     totalMoves += droneSolution.getTotalMoves();
                 }
             }
+            
         }
 
         if (allDronePaths.isEmpty()) {

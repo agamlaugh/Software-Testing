@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * Restricted Area structure from ILP REST service
- * Note: Limits can be ignored, vertices are rectangular
+ * Limits can be ignored, vertices are rectangular
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Getter

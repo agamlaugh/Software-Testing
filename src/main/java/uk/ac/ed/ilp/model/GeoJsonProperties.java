@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * GeoJSON Feature properties
- * Can include metadata about the path
+ * Can include metadata about the path, restricted areas, service points, and delivery points
  */
 @Getter
 @Setter
@@ -20,5 +20,10 @@ public class GeoJsonProperties {
     private List<Integer> deliveryIds;
     private Integer totalMoves;
     private Double totalCost;
+    private String name; // For restricted areas, service points, delivery points
+    private String markerColor; // For styling points (geojson.io recognizes this)
+    private String markerSize; // For styling points
+    private String markerSymbol; // For styling points
+    private String type; // "servicePoint", "deliveryPoint", "restrictedArea", "flightPath"
 }
 

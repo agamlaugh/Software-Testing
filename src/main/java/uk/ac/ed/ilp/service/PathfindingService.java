@@ -74,11 +74,9 @@ public class PathfindingService {
         
         // Initialize start node
         if (!isValidPosition(start, restrictedAreas)) {
-            System.out.println("[DEBUG] A* Start position is INVALID (inside restricted area): " + start);
             return List.of();
         }
         if (!isValidPosition(end, restrictedAreas)) {
-            System.out.println("[DEBUG] A* End position is INVALID (inside restricted area): " + end);
             return List.of();
         }
 
@@ -96,11 +94,6 @@ public class PathfindingService {
         while (!openSet.isEmpty()) {
             if (exploredCount++ > maxNodesExplored) {
                 // If we hit the limit, return empty (failed to find path within limits)
-                Node peek = openSet.peek();
-                String currentStr = peek != null ? peek.position.getLng() + "," + peek.position.getLat() : "null";
-                System.out.println("[DEBUG] A* limit reached (" + maxNodesExplored + " nodes). Giving up. Current: " + 
-                                   currentStr + 
-                                   " Target: " + end.getLng() + "," + end.getLat());
                 return List.of();
             }
             

@@ -98,19 +98,41 @@ public class DroneAvailabilityService {
     
     /**
      * Check if a drone can handle all dispatches
+     * Returns a result object with details about why it failed (for debugging)
      */
-    private boolean canHandleAllDispatches(
+    private static class CanHandleResult {
+        boolean canHandle;
+        String failureReason;
+        
+        CanHandleResult(boolean canHandle, String failureReason) {
+            this.canHandle = canHandle;
+            this.failureReason = failureReason;
+        }
+        
+        static CanHandleResult success() {
+            return new CanHandleResult(true, null);
+        }
+        
+        static CanHandleResult failure(String reason) {
+            return new CanHandleResult(false, reason);
+        }
+    }
+    
+    /**
+     * Check if a drone can handle all dispatches (with detailed failure reasons)
+     */
+    private CanHandleResult canHandleAllDispatchesDetailed(
             Drone drone,
             List<MedDispatchRec> dispatches,
             List<DroneForServicePoint> dronesForServicePoints,
             List<ServicePoint> servicePoints) {
         
         if (drone == null || drone.getCapability() == null) {
-            return false;
+            return CanHandleResult.failure("drone or capability is null");
         }
         
         // Calculate total capacity required (sum of all dispatches)
-        // Per Piazza @120: "it must be the sum (all together)"
+        // Per spec: "A drone must satisfy ALL dispatches" - check total capacity
         double totalCapacityRequired = dispatches.stream()
                 .filter(d -> d != null && d.getRequirements() != null && d.getRequirements().getCapacity() != null)
                 .mapToDouble(d -> d.getRequirements().getCapacity())
@@ -120,29 +142,108 @@ public class DroneAvailabilityService {
         if (totalCapacityRequired > 0) {
             Double droneCapacity = drone.getCapability().getCapacity();
             if (droneCapacity == null || droneCapacity < totalCapacityRequired) {
-                return false;
+                return CanHandleResult.failure("capacity: required " + totalCapacityRequired + " > drone capacity " + droneCapacity);
             }
         }
         
         // Check each dispatch for other requirements (cooling, heating, date/time)
-        // Note: maxCost is NOT checked here for multi-delivery routes because:
-        // 1. It's an approximation (per Piazza @125, @134)
-        // 2. For multiple deliveries, the route cost is shared (one return trip, not per-delivery)
-        // 3. The actual cost will be checked in calcDeliveryPath after path calculation
-        // For single delivery, maxCost is still checked
         if (dispatches.size() == 1) {
-            // Single delivery: check maxCost as part of capability requirements
-            return dispatches.stream()
-                    .allMatch(dispatch -> canHandleDispatchIgnoringCapacity(drone, dispatch, dronesForServicePoints, servicePoints));
+            MedDispatchRec dispatch = dispatches.get(0);
+            if (!canHandleDispatchIgnoringCapacity(drone, dispatch, dronesForServicePoints, servicePoints)) {
+                MedDispatchRequirements req = dispatch.getRequirements();
+                String reason = "capability/availability check failed";
+                if (req != null) {
+                    if (Boolean.TRUE.equals(req.getHeating()) && !Boolean.TRUE.equals(drone.getCapability().getHeating())) {
+                        reason = "heating required but drone doesn't have it";
+                    } else if (Boolean.TRUE.equals(req.getCooling()) && !Boolean.TRUE.equals(drone.getCapability().getCooling())) {
+                        reason = "cooling required but drone doesn't have it";
+                    } else if (dispatch.getDate() != null && dispatch.getTime() != null) {
+                        reason = "not available at date/time " + dispatch.getDate() + " " + dispatch.getTime();
+                    }
+                }
+                return CanHandleResult.failure(reason);
+            }
         } else {
             // Multiple deliveries: skip maxCost check (will be checked in calcDeliveryPath)
-            return dispatches.stream()
-                    .allMatch(dispatch -> canHandleDispatchIgnoringCapacityAndMaxCost(drone, dispatch, dronesForServicePoints, servicePoints));
+            // CRITICAL: Check if dispatches have conflicting heating/cooling requirements
+            // A drone cannot simultaneously provide heating for one delivery and cooling for another
+            boolean hasHeatingRequirement = dispatches.stream()
+                    .anyMatch(d -> d.getRequirements() != null && Boolean.TRUE.equals(d.getRequirements().getHeating()));
+            boolean hasCoolingRequirement = dispatches.stream()
+                    .anyMatch(d -> d.getRequirements() != null && Boolean.TRUE.equals(d.getRequirements().getCooling()));
+            
+            // If we have both heating and cooling requirements, the drone cannot handle both
+            // Per spec: heating and cooling are mutually exclusive per delivery.
+            // If one delivery needs heating and another needs cooling, they cannot be on the same drone
+            // because a drone can only provide one type of temperature control at a time.
+            if (hasHeatingRequirement && hasCoolingRequirement) {
+                // Reject this combination - cannot provide heating for one delivery and cooling for another simultaneously
+                return CanHandleResult.failure("cannot handle both heating and cooling requirements simultaneously (one delivery needs heating, another needs cooling)");
+            }
+            
+            // Now check each dispatch individually
+            for (MedDispatchRec dispatch : dispatches) {
+                if (!canHandleDispatchIgnoringCapacityAndMaxCost(drone, dispatch, dronesForServicePoints, servicePoints)) {
+                    MedDispatchRequirements req = dispatch.getRequirements();
+                    String reason = "capability/availability check failed for delivery " + dispatch.getId();
+                    if (req != null && drone.getCapability() != null) {
+                        // Check heating first
+                        if (Boolean.TRUE.equals(req.getHeating()) && !Boolean.TRUE.equals(drone.getCapability().getHeating())) {
+                            reason = "delivery " + dispatch.getId() + " requires heating but drone doesn't have it";
+                        } 
+                        // Check cooling
+                        else if (Boolean.TRUE.equals(req.getCooling()) && !Boolean.TRUE.equals(drone.getCapability().getCooling())) {
+                            reason = "delivery " + dispatch.getId() + " requires cooling but drone doesn't have it";
+                        } 
+                        // Check date/time (but verify it's actually the issue)
+                        else if (dispatch.getDate() != null && dispatch.getTime() != null) {
+                            // Double-check availability to ensure this is the real issue
+                            boolean actuallyAvailable = isAvailableAtDateTime(drone, dispatch.getDate(), dispatch.getTime(), dronesForServicePoints);
+                            if (!actuallyAvailable) {
+                                reason = "drone not available at date/time " + dispatch.getDate() + " " + dispatch.getTime() + " for delivery " + dispatch.getId();
+                            } else {
+                                // Date/time is fine, so must be something else - check if capability is null
+                                if (drone.getCapability() == null) {
+                                    reason = "drone " + drone.getId() + " has null capability";
+                                } else {
+                                    reason = "unknown capability/availability issue for delivery " + dispatch.getId() + " (date/time is available)";
+                                }
+                            }
+                        }
+                    }
+                    return CanHandleResult.failure(reason);
+                }
+            }
         }
+        
+        return CanHandleResult.success();
     }
     
     /**
-     * Check if a drone can handle a single dispatch (ignoring capacity, which is checked separately as sum)
+     * Check if a drone can handle all dispatches
+     */
+    private boolean canHandleAllDispatches(
+            Drone drone,
+            List<MedDispatchRec> dispatches,
+            List<DroneForServicePoint> dronesForServicePoints,
+            List<ServicePoint> servicePoints) {
+        return canHandleAllDispatchesDetailed(drone, dispatches, dronesForServicePoints, servicePoints).canHandle;
+    }
+    
+    /**
+     * Public method to check if a drone can handle dispatches with detailed failure reason
+     */
+    public String canDroneHandleDispatchesWithReason(
+            Drone drone,
+            List<MedDispatchRec> dispatches,
+            List<DroneForServicePoint> dronesForServicePoints,
+            List<ServicePoint> servicePoints) {
+        CanHandleResult result = canHandleAllDispatchesDetailed(drone, dispatches, dronesForServicePoints, servicePoints);
+        return result.failureReason;
+    }
+    
+    /**
+     * Check if a drone can handle a single dispatch (ignoring capacity, which is checked separately per delivery)
      */
     private boolean canHandleDispatchIgnoringCapacity(
             Drone drone,
@@ -184,13 +285,15 @@ public class DroneAvailabilityService {
         }
         
         // Check capability requirements (excluding capacity AND maxCost)
-        if (!meetsCapabilityRequirementsIgnoringCapacityAndMaxCost(drone, dispatch.getRequirements(), dispatch, dronesForServicePoints, servicePoints)) {
+        boolean meetsCapabilities = meetsCapabilityRequirementsIgnoringCapacityAndMaxCost(drone, dispatch.getRequirements(), dispatch, dronesForServicePoints, servicePoints);
+        if (!meetsCapabilities) {
             return false;
         }
         
         // Check date/time availability (if provided)
         if (dispatch.getDate() != null && dispatch.getTime() != null) {
-            if (!isAvailableAtDateTime(drone, dispatch.getDate(), dispatch.getTime(), dronesForServicePoints)) {
+            boolean isAvailable = isAvailableAtDateTime(drone, dispatch.getDate(), dispatch.getTime(), dronesForServicePoints);
+            if (!isAvailable) {
                 return false;
             }
         }
@@ -230,8 +333,8 @@ public class DroneAvailabilityService {
             }
         }
         
-        // Check maxCost (optional) - estimate using Euclidean distance
-        // Note: For single delivery, maxCost is checked here
+        // Check maxCost estimate using Euclidean distance
+        // For single delivery, maxCost is checked here
         // For multiple deliveries, maxCost is skipped (checked in calcDeliveryPath)
         if (requirements.getMaxCost() != null) {
             if (!meetsMaxCostRequirement(drone, dispatch, requirements.getMaxCost(), dronesForServicePoints, servicePoints)) {
@@ -436,6 +539,18 @@ public class DroneAvailabilityService {
     }
     
     /**
+     * Public method to check if a drone is available at a specific date and time
+     * Used by DeliveryPathService for multi-drone assignment
+     */
+    public boolean isDroneAvailableAtDateTime(
+            Drone drone,
+            String dateStr,
+            String timeStr,
+            List<DroneForServicePoint> dronesForServicePoints) {
+        return isAvailableAtDateTime(drone, dateStr, timeStr, dronesForServicePoints);
+    }
+    
+    /**
      * Check if drone is available at specific date and time
      * date is LocalDate, time is LocalTime
      */
@@ -527,8 +642,9 @@ public class DroneAvailabilityService {
             return false;
         }
         
-        // Check day of week matches
-        if (!dayOfWeek.equalsIgnoreCase(slot.getDayOfWeek())) {
+        // Check day of week matches (case-insensitive)
+        String slotDay = slot.getDayOfWeek();
+        if (!dayOfWeek.equalsIgnoreCase(slotDay)) {
             return false;
         }
         

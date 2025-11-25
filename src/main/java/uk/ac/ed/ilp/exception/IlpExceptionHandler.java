@@ -9,6 +9,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -37,17 +38,26 @@ public class IlpExceptionHandler {
 
     /**
      * Handle JSON parsing exceptions - return 400 Bad Request
+     * Special case: For /query endpoint with empty array, return 200 OK with empty array (per spec)
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, Object>> handleJsonParseException(
+    public ResponseEntity<?> handleJsonParseException(
             HttpMessageNotReadableException ex, WebRequest request) {
+        
+        String path = request.getDescription(false).replace("uri=", "");
+        
+        // Special handling for /query endpoint: per spec, always return 200 OK
+        // If Spring Boot rejects empty array or null body, catch it here and return 200 with empty array
+        if (path.contains("/api/v1/query")) {
+            return ResponseEntity.ok(List.of());
+        }
         
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", HttpStatus.BAD_REQUEST.value());
         body.put("error", "Bad Request");
         body.put("message", "Invalid JSON format");
-        body.put("path", request.getDescription(false).replace("uri=", ""));
+        body.put("path", path);
         
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
@@ -88,17 +98,26 @@ public class IlpExceptionHandler {
 
     /**
      * Handle generic exceptions - return 500 Internal Server Error
+     * Special case: For /query endpoint, return 200 OK with empty array 
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(
+    public ResponseEntity<?> handleGenericException(
             Exception ex, WebRequest request) {
+        
+        String path = request.getDescription(false).replace("uri=", "");
+        
+        // Special handling for /query endpoint: per spec, always return 200 OK
+        // Catch any exception that might occur for empty array or other edge cases
+        if (path.contains("/api/v1/query")) {
+            return ResponseEntity.ok(List.of());
+        }
         
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         body.put("error", "Internal Server Error");
         body.put("message", "An unexpected error occurred");
-        body.put("path", request.getDescription(false).replace("uri=", ""));
+        body.put("path", path);
         
         return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
     }

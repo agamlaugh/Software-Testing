@@ -18,6 +18,7 @@ uk/ac/ed/ilp/service/IlpRestClient.class
 uk/ac/ed/ilp/service/DistanceService.class
 uk/ac/ed/ilp/model/requests/IsInRegionSpecRequest.class
 uk/ac/ed/ilp/service/IlpRestClient$3.class
+uk/ac/ed/ilp/service/DroneAvailabilityService$CanHandleResult.class
 uk/ac/ed/ilp/model/MedDispatchRec.class
 uk/ac/ed/ilp/service/DeliveryPathService.class
 uk/ac/ed/ilp/model/GeoJsonProperties.class

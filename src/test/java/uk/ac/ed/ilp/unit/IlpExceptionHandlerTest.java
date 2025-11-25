@@ -31,9 +31,11 @@ class IlpExceptionHandlerTest {
                 400,
                 "invalid payload"
         );
+        @SuppressWarnings("unchecked")
+        ResponseEntity<Map<String, Object>> jsonResponse = (ResponseEntity<Map<String, Object>>) handler.handleJsonParseException(
+                new org.springframework.http.converter.HttpMessageNotReadableException("boom"), request);
         assertResponse(
-                handler.handleJsonParseException(
-                        new org.springframework.http.converter.HttpMessageNotReadableException("boom"), request),
+                jsonResponse,
                 400,
                 "Invalid JSON format"
         );
@@ -47,8 +49,11 @@ class IlpExceptionHandlerTest {
                 400,
                 "conflict"
         );
+        @SuppressWarnings("unchecked")
+        ResponseEntity<Map<String, Object>> genericResponse = (ResponseEntity<Map<String, Object>>) handler.handleGenericException(
+                new RuntimeException("boom"), request);
         assertResponse(
-                handler.handleGenericException(new RuntimeException("boom"), request),
+                genericResponse,
                 500,
                 "An unexpected error occurred"
         );

@@ -9,7 +9,9 @@ import java.util.List;
 
 /**
  * GeoJSON Geometry structure
- * LineString coordinates: [[lng, lat], [lng, lat], ...]
+ * Supports both LineString and Polygon:
+ * - LineString coordinates: [[lng, lat], [lng, lat], ...]
+ * - Polygon coordinates: [[[lng, lat], [lng, lat], ...]] (array of rings)
  */
 @Getter
 @Setter
@@ -17,6 +19,7 @@ import java.util.List;
 @AllArgsConstructor
 public class GeoJsonGeometry {
     private String type = "LineString";
-    private List<List<Double>> coordinates; // [[lng, lat], [lng, lat], ...]
+    // Use Object to support both LineString (List<List<Double>>) and Polygon (List<List<List<Double>>>)
+    private Object coordinates;
 }
 
