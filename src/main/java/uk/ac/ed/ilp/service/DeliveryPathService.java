@@ -576,4 +576,218 @@ public class DeliveryPathService {
                (c.getCostPerMove() == null ? 0 : c.getCostPerMove()) * moves +
                (c.getCostFinal() == null ? 0 : c.getCostFinal());
     }
+    
+    /**
+     * Compare single-drone vs multi-drone solutions
+     * Returns both solutions with comparison statistics
+     */
+    public RouteComparisonResponse compareRoutes(
+            List<MedDispatchRec> dispatches,
+            List<Drone> allDrones,
+            List<ServicePoint> servicePoints,
+            List<DroneForServicePoint> dronesForServicePoints,
+            List<RestrictedArea> restrictedAreas) {
+        
+        if (dispatches == null || dispatches.isEmpty()) {
+            return RouteComparisonResponse.builder()
+                    .comparison(ComparisonStats.builder()
+                            .singleDronePossible(false)
+                            .recommendation("NONE")
+                            .reason("No deliveries provided")
+                            .build())
+                    .build();
+        }
+        
+        // Calculate single-drone solution (may be null if not possible)
+        DeliveryPathResponse singleDroneSolution = calculateSingleDroneOnly(
+                dispatches, allDrones, servicePoints, dronesForServicePoints, restrictedAreas);
+        
+        // Calculate forced multi-drone solution for comparison
+        // This intentionally splits deliveries across multiple drones even when not necessary
+        DeliveryPathResponse multiDroneSolution = null;
+        
+        if (dispatches.size() >= 2) {
+            // Force split: try to use multiple drones for comparison
+            multiDroneSolution = calculateForcedMultiDroneSolution(
+                    dispatches, allDrones, servicePoints, dronesForServicePoints, restrictedAreas);
+        }
+        
+        // If forced multi didn't work or only 1 delivery, fall back to normal multi-drone
+        if (multiDroneSolution == null || 
+            multiDroneSolution.getDronePaths() == null || 
+            multiDroneSolution.getDronePaths().size() <= 1) {
+            multiDroneSolution = calculateMultiDroneSolution(
+                    dispatches, allDrones, servicePoints, dronesForServicePoints, restrictedAreas);
+        }
+        
+        // Build comparison stats
+        ComparisonStats stats = buildComparisonStats(singleDroneSolution, multiDroneSolution);
+        
+        return RouteComparisonResponse.builder()
+                .singleDroneSolution(singleDroneSolution)
+                .multiDroneSolution(multiDroneSolution)
+                .comparison(stats)
+                .build();
+    }
+    
+    /**
+     * Force a multi-drone solution by splitting deliveries across different drones
+     * Each delivery is assigned to the drone from the NEAREST service point
+     * This is ONLY for comparison purposes - not used in main algorithm
+     */
+    private DeliveryPathResponse calculateForcedMultiDroneSolution(
+            List<MedDispatchRec> dispatches,
+            List<Drone> allDrones,
+            List<ServicePoint> servicePoints,
+            List<DroneForServicePoint> dronesForServicePoints,
+            List<RestrictedArea> restrictedAreas) {
+        
+        if (dispatches == null || dispatches.size() < 2) {
+            return null;
+        }
+        
+        List<DronePath> allDronePaths = new ArrayList<>();
+        double totalCost = 0.0;
+        int totalMoves = 0;
+        Set<String> usedDroneIds = new HashSet<>();
+        
+        // For each delivery, find the drone with the NEAREST service point
+        for (MedDispatchRec dispatch : dispatches) {
+            if (dispatch.getDelivery() == null) continue;
+            
+            LngLat deliveryLocation = dispatch.getDelivery();
+            
+            // Find the best drone: one from the closest service point that can handle this delivery
+            Drone bestDrone = null;
+            ServicePoint bestServicePoint = null;
+            double minDistance = Double.MAX_VALUE;
+            
+            for (Drone drone : allDrones) {
+                // Skip already used drones (force different drones for each delivery)
+                if (usedDroneIds.contains(drone.getId())) continue;
+                
+                ServicePoint servicePoint = findServicePointForDrone(drone.getId(), servicePoints, dronesForServicePoints);
+                if (servicePoint == null || servicePoint.getLocation() == null) continue;
+                
+                // Check if drone can handle this delivery
+                List<MedDispatchRec> singleDelivery = List.of(dispatch);
+                if (!droneAvailabilityService.canDroneHandleDispatches(drone, singleDelivery, dronesForServicePoints, servicePoints)) {
+                    continue;
+                }
+                
+                // Calculate distance from service point to delivery
+                LngLat serviceLocation = new LngLat(
+                        servicePoint.getLocation().getLng(),
+                        servicePoint.getLocation().getLat()
+                );
+                double distance = distanceService.calculateDistance(serviceLocation, deliveryLocation);
+                
+                // Pick the closest service point
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    bestDrone = drone;
+                    bestServicePoint = servicePoint;
+                }
+            }
+            
+            // If we found a suitable drone, calculate its path
+            if (bestDrone != null && bestServicePoint != null) {
+                List<MedDispatchRec> singleDelivery = new ArrayList<>();
+                singleDelivery.add(dispatch);
+                
+                DeliveryPathResponse solution = calculatePathForDrone(
+                        bestDrone, bestServicePoint, singleDelivery, restrictedAreas);
+                
+                if (solution != null && solution.getDronePaths() != null && !solution.getDronePaths().isEmpty()) {
+                    allDronePaths.addAll(solution.getDronePaths());
+                    totalCost += solution.getTotalCost();
+                    totalMoves += solution.getTotalMoves();
+                    usedDroneIds.add(bestDrone.getId());
+                }
+            }
+        }
+        
+        // Only return if we successfully used 2+ drones
+        if (allDronePaths.size() >= 2 && usedDroneIds.size() >= 2) {
+            return new DeliveryPathResponse(totalCost, totalMoves, allDronePaths);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Build comparison statistics between single and multi drone solutions
+     */
+    private ComparisonStats buildComparisonStats(
+            DeliveryPathResponse singleDrone,
+            DeliveryPathResponse multiDrone) {
+        
+        boolean singleDronePossible = singleDrone != null && 
+                singleDrone.getDronePaths() != null && 
+                !singleDrone.getDronePaths().isEmpty();
+        
+        boolean multiDroneValid = multiDrone != null && 
+                multiDrone.getDronePaths() != null && 
+                !multiDrone.getDronePaths().isEmpty();
+        
+        // Extract values
+        Double singleCost = singleDronePossible ? singleDrone.getTotalCost() : null;
+        Integer singleMoves = singleDronePossible ? singleDrone.getTotalMoves() : null;
+        Double multiCost = multiDroneValid ? multiDrone.getTotalCost() : null;
+        Integer multiMoves = multiDroneValid ? multiDrone.getTotalMoves() : null;
+        Integer multiDroneCount = multiDroneValid ? multiDrone.getDronePaths().size() : 0;
+        
+        // Calculate differences
+        Double costDiffPercent = null;
+        Double moveDiffPercent = null;
+        
+        if (singleDronePossible && multiDroneValid && singleCost > 0 && multiCost > 0) {
+            // Positive means multi-drone is cheaper/faster
+            costDiffPercent = ((singleCost - multiCost) / singleCost) * 100;
+            if (singleMoves > 0 && multiMoves > 0) {
+                moveDiffPercent = ((double)(singleMoves - multiMoves) / singleMoves) * 100;
+            }
+        }
+        
+        // Determine recommendation
+        String recommendation;
+        String reason;
+        
+        if (!singleDronePossible && !multiDroneValid) {
+            recommendation = "NONE";
+            reason = "No valid solution found for these deliveries";
+        } else if (!singleDronePossible) {
+            recommendation = "MULTI_DRONE";
+            reason = "Single drone cannot handle all deliveries (capacity/moves/availability constraints)";
+        } else if (!multiDroneValid || multiDroneCount <= 1) {
+            recommendation = "SINGLE_DRONE";
+            reason = "Single drone is the optimal solution";
+        } else {
+            // Both solutions exist - compare them
+            if (singleCost <= multiCost) {
+                double savings = multiCost > 0 ? ((multiCost - singleCost) / multiCost) * 100 : 0;
+                recommendation = "SINGLE_DRONE";
+                reason = String.format("Single drone is %.1f%% cheaper (£%.2f vs £%.2f)", 
+                        savings, singleCost, multiCost);
+            } else {
+                double savings = singleCost > 0 ? ((singleCost - multiCost) / singleCost) * 100 : 0;
+                recommendation = "MULTI_DRONE";
+                reason = String.format("Multi-drone is %.1f%% cheaper (£%.2f vs £%.2f) using %d drones", 
+                        savings, multiCost, singleCost, multiDroneCount);
+            }
+        }
+        
+        return ComparisonStats.builder()
+                .singleDronePossible(singleDronePossible)
+                .costDifferencePercent(costDiffPercent)
+                .moveDifferencePercent(moveDiffPercent)
+                .recommendation(recommendation)
+                .reason(reason)
+                .singleDroneCost(singleCost)
+                .multiDroneCost(multiCost)
+                .singleDroneMoves(singleMoves)
+                .multiDroneMoves(multiMoves)
+                .multiDroneCount(multiDroneCount)
+                .build();
+    }
 }

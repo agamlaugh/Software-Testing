@@ -31,6 +31,8 @@ import uk.ac.ed.ilp.model.GeoJsonGeometry;
 import uk.ac.ed.ilp.model.GeoJsonProperties;
 import uk.ac.ed.ilp.model.DronePath;
 import uk.ac.ed.ilp.model.DeliveryPath;
+import uk.ac.ed.ilp.model.RouteComparisonResponse;
+import uk.ac.ed.ilp.model.ComparisonStats;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -359,6 +361,57 @@ public class ApiController {
         GeoJsonFeatureCollection geoJson = transformToGeoJson(response, restrictedAreas, servicePoints, dispatches);
         
         return ResponseEntity.ok(geoJson);
+    }
+    
+    /**
+     * Compare single-drone vs multi-drone solutions
+     * Returns both solutions with comparison statistics and GeoJSON for each
+     */
+    @PostMapping(
+            value = "/compareRoutes",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<RouteComparisonResponse> compareRoutes(
+            @RequestBody(required = false) List<MedDispatchRec> dispatches) {
+        
+        // Validate request
+        if (dispatches == null || dispatches.isEmpty()) {
+            return ResponseEntity.ok(RouteComparisonResponse.builder()
+                    .comparison(ComparisonStats.builder()
+                            .singleDronePossible(false)
+                            .recommendation("NONE")
+                            .reason("No deliveries provided")
+                            .build())
+                    .build());
+        }
+        
+        // Fetch fresh data from ILP REST service
+        List<Drone> drones = ilpRestClient.fetchDrones();
+        List<ServicePoint> servicePoints = ilpRestClient.fetchServicePoints();
+        List<DroneForServicePoint> dronesForServicePoints = ilpRestClient.fetchDronesForServicePoints();
+        List<RestrictedArea> restrictedAreas = ilpRestClient.fetchRestrictedAreas();
+        
+        // Compare routes using the service
+        RouteComparisonResponse comparison = deliveryPathService.compareRoutes(
+                dispatches, drones, servicePoints, dronesForServicePoints, restrictedAreas);
+        
+        // Add GeoJSON representations for visualization
+        if (comparison.getSingleDroneSolution() != null && 
+            comparison.getSingleDroneSolution().getDronePaths() != null &&
+            !comparison.getSingleDroneSolution().getDronePaths().isEmpty()) {
+            comparison.setSingleDroneGeoJson(
+                    transformToGeoJson(comparison.getSingleDroneSolution(), restrictedAreas, servicePoints, dispatches));
+        }
+        
+        if (comparison.getMultiDroneSolution() != null && 
+            comparison.getMultiDroneSolution().getDronePaths() != null &&
+            !comparison.getMultiDroneSolution().getDronePaths().isEmpty()) {
+            comparison.setMultiDroneGeoJson(
+                    transformToGeoJson(comparison.getMultiDroneSolution(), restrictedAreas, servicePoints, dispatches));
+        }
+        
+        return ResponseEntity.ok(comparison);
     }
     
     /**

@@ -1,4 +1,5 @@
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/IlpApplication.java
+/Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/config/CorsConfig.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/config/IlpConfiguration.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/controller/ApiController.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/controller/HealthController.java
@@ -6,6 +7,7 @@
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/exception/InvalidCoordinatesException.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/exception/InvalidRegionException.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/mapper/PositionMapper.java
+/Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/ComparisonStats.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/DeliveryPath.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/DeliveryPathResponse.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/Drone.java
@@ -24,6 +26,7 @@
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/MedDispatchRequirements.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/Region.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/RestrictedArea.java
+/Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/RouteComparisonResponse.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/ServicePoint.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/requests/DistanceRequest.java
 /Users/agamcohen/Desktop/ilp_submission_2/src/main/java/uk/ac/ed/ilp/model/requests/IsInRegionSpecRequest.java
