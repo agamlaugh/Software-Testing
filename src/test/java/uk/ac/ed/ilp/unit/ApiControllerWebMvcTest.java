@@ -18,6 +18,10 @@ import uk.ac.ed.ilp.service.DistanceService;
 import uk.ac.ed.ilp.service.PositionService;
 import uk.ac.ed.ilp.service.ValidationService;
 import uk.ac.ed.ilp.service.RegionService;
+import uk.ac.ed.ilp.service.IlpRestClient;
+import uk.ac.ed.ilp.service.DroneQueryService;
+import uk.ac.ed.ilp.service.DroneAvailabilityService;
+import uk.ac.ed.ilp.service.DeliveryPathService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
@@ -52,6 +56,18 @@ class ApiControllerWebMvcTest {
     
     @MockBean
     private RegionService regionService;
+
+    @MockBean
+    private IlpRestClient ilpRestClient;
+
+    @MockBean
+    private DroneQueryService droneQueryService;
+
+    @MockBean
+    private DroneAvailabilityService droneAvailabilityService;
+
+    @MockBean
+    private DeliveryPathService deliveryPathService;
 
     // ========== UID ENDPOINT TESTS ==========
 
@@ -456,5 +472,116 @@ class ApiControllerWebMvcTest {
                 .andExpect(status().isBadRequest());
     }
 
-    
+    @Test
+    @DisplayName("POST /api/v1/nextPosition - WebMvc: returns 400 for null start")
+    void nextPosition_returns400_forNullStart() throws Exception {
+        String requestJson = """
+            {
+                "start": null,
+                "angle": 90
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/nextPosition")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid request body"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/nextPosition - WebMvc: returns 400 for null angle")
+    void nextPosition_returns400_forNullAngle() throws Exception {
+        String requestJson = """
+            {
+                "start": {"lng": 0.0, "lat": 0.0},
+                "angle": null
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        when(validationService.isValidAngle(any())).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/nextPosition")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid angle"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/isInRegion - WebMvc: returns false for point outside region")
+    void isInRegion_returnsFalse_forPointOutside() throws Exception {
+        String requestJson = """
+            {
+                "position": {"lng": 2.0, "lat": 2.0},
+                "region": {
+                    "name": "test",
+                    "vertices": [
+                        {"lng": 0.0, "lat": 0.0},
+                        {"lng": 1.0, "lat": 0.0},
+                        {"lng": 1.0, "lat": 1.0},
+                        {"lng": 0.0, "lat": 1.0},
+                        {"lng": 0.0, "lat": 0.0}
+                    ]
+                }
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        when(validationService.hasValidRegionVertices(any())).thenReturn(true);
+        when(validationService.isPolygonClosed(any())).thenReturn(true);
+        when(regionService.contains(any(java.util.List.class), any())).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/isInRegion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(content().string("false"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/isInRegion - WebMvc: returns 400 for invalid position")
+    void isInRegion_returns400_forInvalidPosition() throws Exception {
+        String requestJson = """
+            {
+                "position": {"lng": 200.0, "lat": 0.0},
+                "region": {
+                    "name": "test",
+                    "vertices": [
+                        {"lng": 0.0, "lat": 0.0},
+                        {"lng": 1.0, "lat": 0.0},
+                        {"lng": 1.0, "lat": 1.0},
+                        {"lng": 0.0, "lat": 1.0},
+                        {"lng": 0.0, "lat": 0.0}
+                    ]
+                }
+            }
+            """;
+
+        when(validationService.isValidRequest(any())).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/isInRegion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid position or region vertices"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/isCloseTo - WebMvc: returns 400 for invalid request")
+    void isCloseTo_returns400_forInvalidRequest() throws Exception {
+        when(validationService.isValidRequest(any())).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/isCloseTo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Invalid request body"));
+    }
 }

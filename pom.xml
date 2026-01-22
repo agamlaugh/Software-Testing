@@ -123,7 +123,6 @@
                                 <exclude>uk/ac/ed/ilp/mapper/**</exclude>
                                 <exclude>uk/ac/ed/ilp/exception/**</exclude>
                                 <exclude>uk/ac/ed/ilp/IlpApplication.class</exclude>
-                                <exclude>uk/ac/ed/ilp/service/**</exclude>
                             </excludes>
                         </configuration>
                     </execution>

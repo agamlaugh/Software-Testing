@@ -20,6 +20,12 @@ import uk.ac.ed.ilp.service.IlpRestClient;
 import uk.ac.ed.ilp.service.DroneQueryService;
 import uk.ac.ed.ilp.service.DroneAvailabilityService;
 import uk.ac.ed.ilp.service.DeliveryPathService;
+import uk.ac.ed.ilp.model.Drone;
+import uk.ac.ed.ilp.model.DroneForServicePoint;
+import uk.ac.ed.ilp.model.MedDispatchRec;
+import uk.ac.ed.ilp.model.RestrictedArea;
+import uk.ac.ed.ilp.model.ServicePoint;
+import uk.ac.ed.ilp.model.DeliveryPathResponse;
 
 import java.util.Arrays;
 import java.util.List;
@@ -153,6 +159,262 @@ class ApiControllerMockitoTest {
         var resp = apiController.isInRegion(req);
         assertThat(resp.getStatusCode().value()).isEqualTo(400);
         assertThat(String.valueOf(resp.getBody())).contains("Region polygon must be closed");
+    }
+
+    // ========== CW3 DELIVERY PATH ENDPOINT TESTS ==========
+
+    @Test
+    @DisplayName("calcDeliveryPath: null or empty dispatches returns empty response")
+    void calcDeliveryPath_emptyDispatches() {
+        var respNull = apiController.calcDeliveryPath(null);
+        assertThat(respNull.getStatusCode().value()).isEqualTo(200);
+        assertThat(respNull.getBody().getTotalCost()).isEqualTo(0.0);
+        assertThat(respNull.getBody().getDronePaths()).isEmpty();
+
+        var respEmpty = apiController.calcDeliveryPath(List.of());
+        assertThat(respEmpty.getStatusCode().value()).isEqualTo(200);
+        assertThat(respEmpty.getBody().getTotalCost()).isEqualTo(0.0);
+        assertThat(respEmpty.getBody().getDronePaths()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("calcDeliveryPath: delegates to service with fetched data")
+    void calcDeliveryPath_delegatesToService() {
+        List<MedDispatchRec> dispatches = List.of(new MedDispatchRec());
+        List<Drone> drones = List.of(new Drone());
+        List<ServicePoint> servicePoints = List.of(new ServicePoint());
+        List<DroneForServicePoint> dfsp = List.of(new DroneForServicePoint());
+        List<RestrictedArea> restricted = List.of(new RestrictedArea());
+
+        when(ilpRestClient.fetchDrones()).thenReturn(drones);
+        when(ilpRestClient.fetchServicePoints()).thenReturn(servicePoints);
+        when(ilpRestClient.fetchDronesForServicePoints()).thenReturn(dfsp);
+        when(ilpRestClient.fetchRestrictedAreas()).thenReturn(restricted);
+        DeliveryPathResponse expected = new DeliveryPathResponse(10.0, 5, List.of());
+        when(deliveryPathService.calculateDeliveryPaths(dispatches, drones, servicePoints, dfsp, restricted))
+                .thenReturn(expected);
+
+        var resp = apiController.calcDeliveryPath(dispatches);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("distanceTo: null position1 returns 400")
+    void distanceTo_nullPosition1() {
+        DistanceRequest req = new DistanceRequest();
+        req.setPosition1(null);
+        req.setPosition2(new LngLat(1.0, 1.0));
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        
+        var resp = apiController.distanceTo(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("distanceTo: null position2 returns 400")
+    void distanceTo_nullPosition2() {
+        DistanceRequest req = new DistanceRequest();
+        req.setPosition1(new LngLat(0.0, 0.0));
+        req.setPosition2(null);
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        
+        var resp = apiController.distanceTo(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("isCloseTo: happy path delegates to service")
+    void isCloseTo_happy() {
+        DistanceRequest req = new DistanceRequest();
+        LngLat p1 = new LngLat(0.0, 0.0);
+        LngLat p2 = new LngLat(0.0001, 0.0001);
+        req.setPosition1(p1);
+        req.setPosition2(p2);
+        
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        when(validationService.areValidPositions(p1, p2)).thenReturn(true);
+        when(distanceService.areClose(p1, p2)).thenReturn(true);
+        
+        var resp = apiController.isCloseTo(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("isCloseTo: null position1 returns 400")
+    void isCloseTo_nullPosition1() {
+        DistanceRequest req = new DistanceRequest();
+        req.setPosition1(null);
+        req.setPosition2(new LngLat(1.0, 1.0));
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        
+        var resp = apiController.isCloseTo(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("nextPosition: null start returns 400")
+    void nextPosition_nullStart() {
+        NextPositionRequest req = new NextPositionRequest();
+        req.setStart(null);
+        req.setAngle(45.0);
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        
+        var resp = apiController.nextPosition(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("isInRegion: null position returns 400")
+    void isInRegion_nullPosition() {
+        IsInRegionSpecRequest req = new IsInRegionSpecRequest();
+        req.setPosition(null);
+        Region region = new Region();
+        region.setVertices(List.of(new LngLat(0.0, 0.0)));
+        req.setRegion(region);
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        
+        var resp = apiController.isInRegion(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("isInRegion: null region returns 400")
+    void isInRegion_nullRegion() {
+        IsInRegionSpecRequest req = new IsInRegionSpecRequest();
+        req.setPosition(new LngLat(0.5, 0.5));
+        req.setRegion(null);
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        
+        var resp = apiController.isInRegion(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("isInRegion: empty vertices returns 400")
+    void isInRegion_emptyVertices() {
+        IsInRegionSpecRequest req = new IsInRegionSpecRequest();
+        req.setPosition(new LngLat(0.5, 0.5));
+        Region region = new Region();
+        region.setVertices(List.of());
+        req.setRegion(region);
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        when(validationService.isValidPosition(any())).thenReturn(true);
+        
+        var resp = apiController.isInRegion(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("isInRegion: invalid vertices returns 400")
+    void isInRegion_invalidVertices() {
+        IsInRegionSpecRequest req = new IsInRegionSpecRequest();
+        LngLat pos = new LngLat(0.5, 0.5);
+        Region region = new Region();
+        region.setVertices(List.of(new LngLat(0.0, 0.0)));
+        req.setPosition(pos);
+        req.setRegion(region);
+        
+        when(validationService.isValidRequest(req)).thenReturn(true);
+        when(validationService.isValidPosition(pos)).thenReturn(true);
+        when(validationService.hasValidRegionVertices(region)).thenReturn(false);
+        
+        var resp = apiController.isInRegion(req);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("droneDetails: returns drone when found")
+    void droneDetails_found() {
+        Drone drone = new Drone();
+        drone.setId("d1");
+        when(ilpRestClient.fetchDrones()).thenReturn(List.of(drone));
+        
+        var resp = apiController.droneDetails("d1");
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).isSameAs(drone);
+    }
+
+    @Test
+    @DisplayName("droneDetails: returns 404 when not found")
+    void droneDetails_notFound() {
+        when(ilpRestClient.fetchDrones()).thenReturn(List.of());
+        
+        var resp = apiController.droneDetails("nonexistent");
+        assertThat(resp.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    @DisplayName("queryAsPath: delegates to service")
+    void queryAsPath_delegates() {
+        Drone drone = new Drone();
+        drone.setId("d1");
+        drone.setName("test");
+        when(ilpRestClient.fetchDrones()).thenReturn(List.of(drone));
+        when(droneQueryService.queryByAttribute(any(), eq("name"), eq("test"))).thenReturn(List.of("d1"));
+        
+        var resp = apiController.queryAsPath("name", "test");
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).contains("d1");
+    }
+
+    @Test
+    @DisplayName("query: null conditions returns empty list")
+    void query_nullConditions() {
+        var resp = apiController.query(null);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("query: empty conditions returns empty list")
+    void query_emptyConditions() {
+        var resp = apiController.query(List.of());
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("queryAvailableDrones: null dispatches returns empty list")
+    void queryAvailableDrones_null() {
+        var resp = apiController.queryAvailableDrones(null);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("queryAvailableDrones: empty dispatches returns empty list")
+    void queryAvailableDrones_empty() {
+        var resp = apiController.queryAvailableDrones(List.of());
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("dronesWithCooling: filters by cooling state")
+    void dronesWithCooling_filters() {
+        Drone drone1 = new Drone();
+        drone1.setId("d1");
+        uk.ac.ed.ilp.model.DroneCapability cap1 = new uk.ac.ed.ilp.model.DroneCapability();
+        cap1.setCooling(true);
+        drone1.setCapability(cap1);
+        
+        Drone drone2 = new Drone();
+        drone2.setId("d2");
+        uk.ac.ed.ilp.model.DroneCapability cap2 = new uk.ac.ed.ilp.model.DroneCapability();
+        cap2.setCooling(false);
+        drone2.setCapability(cap2);
+        
+        when(ilpRestClient.fetchDrones()).thenReturn(List.of(drone1, drone2));
+        
+        var resp = apiController.dronesWithCooling(true);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp.getBody()).containsExactly("d1");
+        
+        var resp2 = apiController.dronesWithCooling(false);
+        assertThat(resp2.getStatusCode().value()).isEqualTo(200);
+        assertThat(resp2.getBody()).containsExactly("d2");
     }
 }
 

@@ -1,0 +1,12 @@
+target/
+!target/*.jar
+node_modules/
+.idea/
+.vscode/
+*.iml
+cw3-frontend/
+.git/
+.gitignore
+.DS_Store
+*.log
+docker-compose.yml

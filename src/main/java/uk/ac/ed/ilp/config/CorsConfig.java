@@ -21,6 +21,8 @@ public class CorsConfig {
         // Allow requests from React development server
         config.addAllowedOrigin("http://localhost:3000");
         config.addAllowedOrigin("http://127.0.0.1:3000");
+        config.addAllowedOrigin("http://localhost:3001");
+        config.addAllowedOrigin("http://127.0.0.1:3001");
         
         // Allow all HTTP methods
         config.addAllowedMethod("*");
